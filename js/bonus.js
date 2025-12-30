@@ -9,7 +9,7 @@ import {
     addDoc,
     updateDoc,
     doc,
-    getTeamCollectionRef,
+    getTeamsCollectionRef,
     getBonusCollectionRef
 } from './firebase-config.js';
 import { messageBox, showProgressBar, hideProgressBar, updateProgress } from './utils.js';
@@ -53,7 +53,7 @@ export const loadBonusData = async () => {
     
     try {
         // Carica le squadre dal CSV/database
-        const teamsSnapshot = await getDocs(getTeamCollectionRef());
+        const teamsSnapshot = await getDocs(getTeamsCollectionRef());
         const teams = teamsSnapshot.docs.map(doc => doc.data().name).sort();
         
         if (teams.length === 0) {
