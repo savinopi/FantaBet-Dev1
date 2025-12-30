@@ -1,0 +1,25 @@
+# Dipendenze
+node_modules/
+
+# File di sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Log
+*.log
+npm-debug.log*
+
+# File temporanei
+*.tmp
+*.temp
+
+# File di configurazione locale (se contengono credenziali)
+# .env
+# config.local.js

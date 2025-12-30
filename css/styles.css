@@ -1,0 +1,832 @@
+/* ===================================
+   FANTABet - Stili CSS Principali
+   Separato dal file HTML per una migliore manutenibilità
+   =================================== */
+
+/* ===================================
+   OTTIMIZZAZIONE SAFE AREA SMARTPHONE
+   Gestione notch, Dynamic Island e barra di stato
+   per iPhone e altri smartphone moderni
+   =================================== */
+
+/* Safe area support per smartphone con notch/barra di stato */
+:root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+}
+
+/* Previene lo zoom su iOS quando si tappa su input */
+* {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    -webkit-touch-callout: none;
+}
+
+/* Migliora lo scrolling su iOS */
+body, html {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
+}
+
+body { 
+    font-family: 'Inter', sans-serif; 
+    background-color: #0a1628; 
+    color: #e0e7ff;
+    background-image: url('https://raw.githubusercontent.com/savinopi/FantaBet-OP/main/Stadium.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    /* Padding per safe area */
+    padding-top: max(0.75rem, var(--safe-area-inset-top));
+    padding-right: max(0.75rem, var(--safe-area-inset-right));
+    padding-bottom: max(0.75rem, var(--safe-area-inset-bottom));
+    padding-left: max(0.75rem, var(--safe-area-inset-left));
+}
+
+/* Overlay blu per migliorare la leggibilità */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 22, 40, 0.25);
+    z-index: -1;
+}
+
+/* ===================================
+   COMPONENTI COMUNI
+   =================================== */
+
+.card { 
+    background-color: rgba(15, 23, 42, 0.95); 
+    border-radius: 12px; 
+    border: 1px solid #1e3a8a; 
+    padding: 16px; 
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); 
+    backdrop-filter: blur(10px); 
+}
+
+/* Responsive padding for cards */
+@media (min-width: 768px) {
+    .card { padding: 24px; }
+}
+
+/* ===================================
+   PULSANTI
+   Ottimizzati per mobile con minimo 44x44px (Apple HIG)
+   =================================== */
+
+.btn-primary { 
+    background-color: #2563eb; 
+    color: white; 
+    padding: 14px 20px; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    font-size: 16px;
+    min-height: 44px;
+    transition: background-color 0.2s; 
+    cursor: pointer;
+    touch-action: manipulation;
+    position: relative;
+    overflow: hidden;
+}
+.btn-primary:hover { background-color: #1d4ed8; }
+
+/* Effetto shimmer per i bottoni */
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-primary:hover::before {
+    left: 100%;
+}
+
+.btn-secondary { 
+    background-color: #1e3a8a; 
+    color: #e0e7ff; 
+    padding: 14px 20px; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    font-size: 16px;
+    min-height: 44px;
+    transition: background-color 0.2s; 
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.btn-secondary:hover { background-color: #1e40af; }
+
+.btn-danger { 
+    background-color: #dc2626; 
+    color: white; 
+    padding: 14px 20px; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    font-size: 16px;
+    min-height: 44px;
+    transition: background-color 0.2s; 
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.btn-danger:hover { background-color: #b91c1c; }
+
+.btn-success { 
+    background-color: #10b981; 
+    color: white; 
+    padding: 14px 20px; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    font-size: 16px;
+    min-height: 44px;
+    transition: background-color 0.2s; 
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.btn-success:hover { background-color: #059669; }
+
+/* ===================================
+   INPUT
+   Ottimizzati per mobile
+   =================================== */
+
+input[type="number"], 
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+select, 
+input[type="date"] {
+    background-color: #0f172a;
+    border: 1px solid #1e3a8a;
+    color: #e0e7ff;
+    padding: 12px;
+    border-radius: 6px;
+    width: 100%;
+    font-size: 16px; /* Previene zoom automatico su iOS */
+    min-height: 44px;
+}
+
+/* ===================================
+   SCOMMESSE
+   =================================== */
+
+.bet-option {
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+    background-color: #1e293b;
+    padding: 14px;
+    min-height: 50px;
+    font-size: 15px;
+    touch-action: manipulation;
+}
+
+@media (min-width: 768px) {
+    .bet-option {
+        padding: 12px;
+        font-size: 14px;
+    }
+}
+
+.bet-option:hover:not(.pointer-events-none) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.4);
+    border-color: #3b82f6;
+}
+
+.bet-option.pointer-events-none {
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.bet-option.opacity-50 {
+    opacity: 0.5;
+}
+
+/* Stile per indicare la selezione attiva (prediction locale) */
+.bet-option.local-selected {
+    border-color: #3b82f6;
+    background-color: #1e3a8a; 
+    box-shadow: 0 0 10px #3b82f6;
+}
+
+/* Stile per indicare una scommessa SALVATA in Firestore */
+.bet-option.saved-bet {
+    border-color: #2563eb;
+    background-color: #1e40af;
+    box-shadow: 0 0 10px #2563eb;
+}
+
+/* ===================================
+   ANIMAZIONI
+   =================================== */
+
+/* Stili per il countdown animato */
+@keyframes pulse-countdown {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+.countdown-urgent {
+    animation: pulse-countdown 2s ease-in-out infinite;
+}
+
+/* Animazioni per il sorteggio */
+@keyframes scale-in {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg) scale(1);
+    }
+    50% {
+        transform: rotate(180deg) scale(1.2);
+    }
+    100% {
+        transform: rotate(360deg) scale(1);
+    }
+}
+
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(251, 191, 36, 0.5), 0 0 10px rgba(251, 191, 36, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(251, 191, 36, 0.8), 0 0 30px rgba(251, 191, 36, 0.4);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.animate-scale-in {
+    animation: scale-in 0.5s ease-out forwards;
+}
+
+/* Animazione fade-out per notifiche */
+@keyframes fade-out {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(100%); }
+}
+
+.animate-fade-out {
+    animation: fade-out 0.3s ease-out forwards;
+}
+
+/* Animazione suspense per l'estrazione */
+@keyframes suspense-reveal {
+    0% {
+        filter: brightness(0) blur(20px);
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    50% {
+        filter: brightness(0) blur(10px);
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    100% {
+        filter: brightness(1) blur(0);
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.suspense-animation {
+    animation: suspense-reveal 3s ease-out forwards;
+}
+
+/* ===================================
+   SORTEGGIO COPPA ITALIA
+   Layout Desktop-Only
+   =================================== */
+
+.draw-desktop-layout {
+    min-width: 1024px;
+    max-width: 100%;
+    width: 100%;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+}
+
+#draw-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow-x: auto;
+    overflow-y: auto;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+    z-index: 50;
+    padding-top: var(--safe-area-inset-top);
+    padding-right: var(--safe-area-inset-right);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
+}
+
+/* Effetti luminosi per i gruppi */
+#draw-container .col-span-4:first-child > div {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+    transition: all 0.3s ease;
+}
+
+#draw-container .col-span-4:last-child > div {
+    box-shadow: 0 0 30px rgba(14, 165, 233, 0.3);
+    transition: all 0.3s ease;
+}
+
+/* Animazione per il team estratto */
+#drawn-team > div {
+    animation: glow 2s ease-in-out infinite;
+}
+
+/* Scrollbar personalizzata per i gruppi */
+#group-a-teams::-webkit-scrollbar,
+#group-b-teams::-webkit-scrollbar {
+    width: 8px;
+}
+
+#group-a-teams::-webkit-scrollbar-track,
+#group-b-teams::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+#group-a-teams::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.5);
+    border-radius: 10px;
+}
+
+#group-b-teams::-webkit-scrollbar-thumb {
+    background: rgba(14, 165, 233, 0.5);
+    border-radius: 10px;
+}
+
+#group-a-teams::-webkit-scrollbar-thumb:hover,
+#group-b-teams::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* ===================================
+   TABELLE
+   =================================== */
+
+/* Stile specifico per l'intestazione della giornata */
+.giornata-header th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.875rem;
+    color: #60a5fa;
+    border-bottom: 2px solid #1e3a8a;
+}
+
+@media (min-width: 768px) {
+    .giornata-header th {
+        padding: 12px 16px;
+        font-size: 1rem;
+    }
+}
+
+/* Ottimizzazione tabelle per mobile */
+table {
+    font-size: 0.875rem;
+}
+
+@media (min-width: 768px) {
+    table {
+        font-size: 1rem;
+    }
+}
+
+table th, table td {
+    padding: 8px 6px;
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    table th, table td {
+        padding: 12px 16px;
+    }
+}
+
+/* Nascondi scrollbar ma mantieni funzionalità scroll */
+.hide-scrollbar {
+    -ms-overflow-style: none;  /* IE e Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari e Opera */
+}
+
+/* ===================================
+   MODALI
+   =================================== */
+
+/* Stile per la modale di conferma */
+.confirm-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(10, 22, 40, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 16px;
+}
+
+.confirm-modal-content {
+    background-color: #0f172a;
+    padding: 20px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+    border: 1px solid #1e3a8a;
+    text-align: center;
+}
+
+@media (min-width: 768px) {
+    .confirm-modal-content {
+        padding: 24px;
+    }
+}
+
+/* Modifica per centrare i messaggi di notifica */
+#message-box {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(10, 22, 40, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 16px;
+}
+
+#message-box:not(.hidden) {
+    display: flex;
+}
+
+/* Progress bar container */
+#progress-bar-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(10, 22, 40, 0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 16px;
+}
+
+#progress-bar-container:not(.hidden) {
+    display: flex;
+}
+
+/* ===================================
+   MENU UTENTE
+   =================================== */
+
+#user-menu-toggle {
+    transition: transform 0.2s;
+}
+
+#user-menu-dropdown {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out, visibility 0.3s;
+}
+
+#user-menu-dropdown.open {
+    max-height: 400px;
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ===================================
+   IMMAGINI
+   Ottimizzazioni per mobile
+   =================================== */
+
+/* Forza tutte le immagini a rimanere nei loro contenitori */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Contenitori di immagini - previeni overflow */
+.card, [class*="col-"], [class*="flex"], [class*="grid"] {
+    overflow: hidden;
+}
+
+/* Fix specifico per container con immagini */
+.card img, 
+td img, 
+th img,
+div[class*="flex"] img,
+div[class*="grid"] img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Fix per container specifici che contengono loghi squadre */
+.team-logo-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+/* Previeni text overflow */
+.text-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Container generale - previeni overflow orizzontale */
+.container, main, section {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* ===================================
+   RESPONSIVE - MOBILE
+   Ottimizzazioni per schermi piccoli
+   =================================== */
+
+/* Ottimizzazioni per schermi molto piccoli (iPhone 12 mini: 375x812) */
+@media (max-width: 480px) {
+    /* Riduci padding generale */
+    body {
+        padding: 8px !important;
+    }
+    
+    /* Card più compatte */
+    .card {
+        padding: 12px !important;
+        margin-bottom: 12px;
+    }
+    
+    /* Wrapper per tabelle con scroll orizzontale */
+    table {
+        font-size: 0.75rem !important;
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    table thead, table tbody, table tr {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+    }
+    
+    table th, table td {
+        padding: 6px 4px !important;
+        font-size: 0.75rem !important;
+    }
+    
+    /* Immagini più piccole nelle tabelle */
+    td img, th img {
+        max-width: 24px !important;
+        max-height: 24px !important;
+    }
+    
+    /* Logo header più piccolo */
+    header img {
+        max-width: 60px !important;
+        max-height: 60px !important;
+    }
+    
+    /* Pulsanti più compatti */
+    button, .btn-primary, .btn-secondary, .btn-danger, .btn-success {
+        padding: 10px 12px !important;
+        font-size: 14px !important;
+        min-height: 40px !important;
+    }
+    
+    /* Grid responsive - mantieni 2 colonne ma più compatte */
+    .grid.grid-cols-2 {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    
+    /* Grid con 3+ colonne diventa 1 colonna */
+    .grid:not(.grid-cols-2) {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+    
+    /* Flex containers - previeni overflow */
+    .flex {
+        flex-wrap: wrap !important;
+    }
+    
+    /* Text più piccolo dove necessario */
+    h1 { font-size: 1.5rem !important; }
+    h2 { font-size: 1.25rem !important; }
+    h3 { font-size: 1.125rem !important; }
+    h4 { font-size: 1rem !important; }
+}
+
+/* Ottimizzazioni per smartphone standard (fino a 768px) */
+@media (max-width: 768px) {
+    /* Container principale più stretto */
+    .max-w-4xl, .max-w-6xl, .max-w-7xl {
+        max-width: 100% !important;
+    }
+    
+    /* Wrapper per tutte le tabelle - scroll orizzontale */
+    .table-wrapper, .overflow-x-auto {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+    
+    /* Tabelle - previeni rottura layout */
+    table {
+        min-width: 600px; /* Mantiene struttura tabella */
+    }
+    
+    /* Card aspect-square più piccole su mobile */
+    .aspect-square {
+        min-height: 120px !important;
+    }
+    
+    /* Padding ridotto per contenitori principali */
+    .px-3, .px-6 {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    /* Spazi verticali ridotti */
+    .space-y-6 > * + * {
+        margin-top: 1rem !important;
+    }
+    
+    .mb-6, .mt-6 {
+        margin-bottom: 1rem !important;
+        margin-top: 1rem !important;
+    }
+    
+    /* Mantieni grid a 2 colonne ma ottimizza dimensioni */
+    .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+/* ===================================
+   TABELLE RESPONSIVE
+   =================================== */
+
+/* Wrapper per tabelle responsive - forza scroll orizzontale */
+.responsive-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0;
+    padding: 0;
+}
+
+.responsive-table-wrapper table {
+    width: 100%;
+    min-width: max-content;
+}
+
+/* Stile per indicare che la tabella è scrollabile */
+@media (max-width: 768px) {
+    .responsive-table-wrapper::after {
+        content: '← Scorri per vedere tutto →';
+        display: block;
+        text-align: center;
+        font-size: 0.75rem;
+        color: #9ca3af;
+        padding: 0.5rem;
+        font-style: italic;
+    }
+    
+    .responsive-table-wrapper:not(:hover)::after {
+        animation: pulse 2s ease-in-out infinite;
+    }
+}
+
+/* ===================================
+   CLASSIFICA - MOBILE
+   =================================== */
+
+@media (max-width: 640px) {
+    #standings-container {
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+    }
+    
+    #standings-container table {
+        font-size: 0.7rem;
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+    }
+    
+    #standings-container table th,
+    #standings-container table td {
+        padding: 0.4rem 0.15rem !important;
+    }
+    
+    /* Colonna posizione */
+    #standings-container table th:nth-child(1),
+    #standings-container table td:nth-child(1) {
+        width: 25px !important;
+        padding: 0.4rem 0.1rem !important;
+    }
+    
+    /* Colonna logo */
+    #standings-container table th:nth-child(2),
+    #standings-container table td:nth-child(2) {
+        width: 30px !important;
+        padding: 0.4rem 0.1rem !important;
+    }
+    
+    /* Colonna nome squadra */
+    #standings-container table th:nth-child(3),
+    #standings-container table td:nth-child(3) {
+        width: auto !important;
+        min-width: 50px !important;
+        max-width: 70px !important;
+        padding: 0.4rem 0.15rem !important;
+    }
+    
+    /* Colonne punti */
+    #standings-container table th:nth-child(4),
+    #standings-container table th:nth-child(5),
+    #standings-container table td:nth-child(4),
+    #standings-container table td:nth-child(5) {
+        display: table-cell !important;
+        width: 38px !important;
+        min-width: 38px !important;
+        padding: 0.4rem 0.1rem !important;
+    }
+    
+    /* Logo squadra più piccolo su mobile */
+    #standings-container table td img {
+        width: 24px !important;
+        height: 24px !important;
+        min-width: 24px;
+        min-height: 24px;
+    }
+    
+    /* Nome squadra con troncamento testo */
+    #standings-container table td:nth-child(3) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    /* Font più piccolo per i numeri su mobile */
+    #standings-container table td:nth-child(4),
+    #standings-container table td:nth-child(5) {
+        font-size: 0.85rem !important;
+    }
+}
