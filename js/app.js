@@ -213,6 +213,10 @@ const setupFirebase = async () => {
             calculateStandings: calculateStandings
         });
         
+        // Setup dipendenze per admin.js - sarà completato dopo che le funzioni sono definite
+        // Le funzioni loadAllSchedules, loadActiveGiornata, getGiornataSchedule 
+        // saranno disponibili dopo l'inizializzazione
+        
         document.getElementById('auth-status').textContent = 'In attesa di autenticazione...';
         
         // Setup listener per stato autenticazione
@@ -679,6 +683,14 @@ document.addEventListener('click', (event) => {
  */
 export const initializeApp = () => {
     console.log('FANTABet - Inizializzazione...');
+    
+    // Setup dipendenze per admin.js (le funzioni sono definite in questo modulo)
+    setAdminDependencies({
+        loadAllSchedules: loadAllSchedules,
+        loadActiveGiornata: loadActiveGiornata,
+        getGiornataSchedule: getGiornataSchedule
+    });
+    
     setupFirebase();
 };
 
