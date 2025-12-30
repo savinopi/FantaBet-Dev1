@@ -6,6 +6,11 @@
 
 import { getTeamLogo } from './config.js';
 import * as state from './state.js';
+import { 
+    getDocs, 
+    getPlayersCollectionRef, 
+    getPlayerStatsCollectionRef 
+} from './firebase-config.js';
 
 // ===================================
 // FORMATTAZIONE DATE
@@ -254,7 +259,7 @@ export const renderStandings = (sortColumn = null) => {
         const goalDiffText = goalDiff > 0 ? `+${goalDiff}` : goalDiff.toString();
         
         html += `
-            <tr class="hover:bg-gray-700/50 transition-colors">
+            <tr class="hover:bg-gray-700/50 transition-colors cursor-pointer" onclick="showTeamStats('${team.team.replace(/'/g, "\\'")}')">
                 <td style="padding: 0.5rem 0.25rem; text-align: center;" class="${posClass}">${pos}</td>
                 <td style="padding: 0.5rem 0.15rem;">
                     <img src="${getTeamLogo(team.team)}" alt="${team.team}" 
@@ -615,6 +620,268 @@ export const renderStandingsTrend = () => {
 };
 
 // ===================================
+// STATISTICHE SQUADRA
+// ===================================
+
+/**
+ * Mostra le statistiche dettagliate di una squadra
+ * @param {string} teamName - Nome della squadra
+ */
+export const showTeamStats = async (teamName) => {
+    const modal = document.getElementById('team-stats-modal');
+    const content = document.getElementById('team-stats-content');
+    
+    if (!modal || !content) {
+        console.error('Modal team-stats non trovato');
+        return;
+    }
+    
+    // Mostra loading
+    content.innerHTML = '<div class="text-center py-8"><div class="animate-spin inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div><p class="text-gray-400 mt-4">Caricamento statistiche...</p></div>';
+    modal.classList.remove('hidden');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    try {
+        // Carica i dati dei giocatori dal database
+        const playersSnapshot = await getDocs(getPlayersCollectionRef());
+        
+        if (playersSnapshot.empty) {
+            content.innerHTML = '<p class="text-red-400 text-center py-4">Carica prima i dati delle rose per visualizzare le statistiche</p>';
+            return;
+        }
+        
+        // Raggruppa giocatori per squadra
+        const teamPlayers = [];
+        playersSnapshot.forEach(doc => {
+            const player = doc.data();
+            if (player.squadName === teamName) {
+                teamPlayers.push(player);
+            }
+        });
+        
+        if (teamPlayers.length === 0) {
+            content.innerHTML = `<p class="text-red-400 text-center py-4">Nessun giocatore trovato per ${teamName}</p>`;
+            return;
+        }
+        
+        // Carica le statistiche dei giocatori
+        const statsSnapshot = await getDocs(getPlayerStatsCollectionRef());
+        
+        // Funzione per normalizzare i nomi
+        const normalizeName = (name) => {
+            return name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        };
+        
+        // Crea mappa statistiche per nome giocatore normalizzato
+        const statsMap = new Map();
+        statsSnapshot.forEach(doc => {
+            const stat = doc.data();
+            if (stat.fantaSquad === teamName) {
+                const normalizedName = normalizeName(stat.playerName || stat.Name || '');
+                statsMap.set(normalizedName, stat);
+            }
+        });
+        
+        // Arricchisci i giocatori con le loro statistiche
+        const playersWithStats = teamPlayers.map(player => {
+            const normalizedPlayerName = normalizeName(player.playerName);
+            const stats = statsMap.get(normalizedPlayerName);
+            let ruolo = player.role || player.ruolo || player.R || (stats ? (stats.role || stats.ruolo || stats.R) : null);
+            
+            return {
+                Name: player.playerName,
+                R: ruolo,
+                Id: stats ? (stats.playerId || stats.Id) : null,
+                Fm: stats ? (parseFloat(stats.fm) || 0) : 0,
+                Pv: stats ? (parseInt(stats.pv) || 0) : 0,
+                Gf: stats ? (parseInt(stats.gf) || 0) : 0,
+                Gs: stats ? (parseInt(stats.gs) || 0) : 0,
+                Rp: stats ? (parseInt(stats.rp) || 0) : 0,
+                Ass: stats ? (parseInt(stats.ass) || 0) : 0
+            };
+        });
+        
+        // Calcola posizione in classifica
+        const standings = calculateStandings(state.allResults);
+        const position = standings.findIndex(t => t.team === teamName) + 1;
+        
+        // Filtra giocatori con almeno 5 presenze
+        const playersWithEnoughGames = playersWithStats.filter(p => p.Pv >= 5);
+        
+        const ruoli = {
+            'P': { nome: 'Portiere', emoji: '🧤', color: 'yellow' },
+            'D': { nome: 'Difensore', emoji: '🛡️', color: 'blue' },
+            'C': { nome: 'Centrocampista', emoji: '⚙️', color: 'green' },
+            'A': { nome: 'Attaccante', emoji: '⚽', color: 'red' }
+        };
+        
+        // Trova migliori giocatori per ruolo
+        const bestByRole = {};
+        Object.keys(ruoli).forEach(ruolo => {
+            const playersInRole = playersWithEnoughGames.filter(p => p.R === ruolo);
+            if (playersInRole.length > 0) {
+                bestByRole[ruolo] = playersInRole.reduce((best, player) => 
+                    (player.Fm || 0) > (best.Fm || 0) ? player : best
+                );
+            }
+        });
+        
+        // Miglior giocatore assoluto
+        const bestPlayer = playersWithEnoughGames.length > 0 
+            ? playersWithEnoughGames.reduce((best, player) => (player.Fm || 0) > (best.Fm || 0) ? player : best)
+            : null;
+        
+        // Top scorer
+        const scorers = playersWithStats.filter(p => (p.Gf || 0) > 0);
+        const topScorer = scorers.length > 0 
+            ? scorers.reduce((best, player) => (player.Gf || 0) > (best.Gf || 0) ? player : best)
+            : playersWithStats[0];
+        
+        // Top assistman
+        const assistmen = playersWithStats.filter(p => (p.Ass || 0) > 0);
+        const topAssistman = assistmen.length > 0
+            ? assistmen.reduce((best, player) => (player.Ass || 0) > (best.Ass || 0) ? player : best)
+            : playersWithStats[0];
+        
+        // Genera HTML
+        let html = `
+            <!-- Header Squadra -->
+            <div class="card bg-gradient-to-br from-slate-900 via-blue-900/50 to-slate-900 border-2 border-blue-400 shadow-xl mb-6">
+                <div class="flex flex-col md:flex-row items-center justify-between p-6 gap-4">
+                    <div class="flex items-center gap-4">
+                        <img src="${getTeamLogo(teamName)}" alt="${teamName}" class="w-20 h-20 object-contain" onerror="this.style.display='none'">
+                        <div>
+                            <h2 class="text-3xl font-black text-white mb-1">${teamName}</h2>
+                            <span class="px-3 py-1 bg-yellow-500 text-black font-bold rounded-full text-sm">#${position} in classifica</span>
+                        </div>
+                    </div>
+                    <div class="text-gray-400">${playersWithStats.length} giocatori</div>
+                </div>
+            </div>
+            
+            <!-- Migliori per Ruolo -->
+            <div class="card bg-slate-900 border border-slate-700 mb-6">
+                <div class="bg-gradient-to-r from-blue-600 to-purple-600 p-4 rounded-t-xl">
+                    <h3 class="text-xl font-bold text-white">🏆 TOP PER RUOLO</h3>
+                </div>
+                <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        `;
+        
+        Object.keys(ruoli).forEach(ruolo => {
+            const player = bestByRole[ruolo];
+            const ruoloInfo = ruoli[ruolo];
+            if (player) {
+                html += `
+                    <div class="bg-slate-800 border border-${ruoloInfo.color}-500/50 rounded-lg p-4">
+                        <div class="flex items-center gap-3">
+                            ${player.Id ? `<img src="https://content.fantacalcio.it/web/campioncini/20/card/${player.Id}.png?v=466" alt="${player.Name}" class="w-16 h-20 object-cover rounded" onerror="this.style.display='none'">` : ''}
+                            <div class="flex-1">
+                                <span class="text-xs text-${ruoloInfo.color}-400">${ruoloInfo.emoji} ${ruoloInfo.nome}</span>
+                                <h4 class="font-bold text-white">${player.Name}</h4>
+                                <div class="flex gap-4 mt-1 text-sm">
+                                    <span class="text-yellow-400">FM: ${player.Fm?.toFixed(1) || '0.0'}</span>
+                                    <span class="text-blue-400">Pv: ${player.Pv || 0}</span>
+                                    <span class="text-green-400">Gol: ${player.Gf || 0}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="bg-slate-800/50 border border-dashed border-slate-600 rounded-lg p-4">
+                        <span class="text-gray-500">${ruoloInfo.emoji} ${ruoloInfo.nome}: Nessuno con 5+ presenze</span>
+                    </div>
+                `;
+            }
+        });
+        
+        html += `</div></div>`;
+        
+        // MVP
+        if (bestPlayer) {
+            html += `
+                <div class="card bg-gradient-to-br from-purple-950/50 to-slate-900 border-2 border-purple-500 mb-6">
+                    <div class="bg-gradient-to-r from-purple-600 to-pink-600 p-4 rounded-t-xl">
+                        <h3 class="text-xl font-bold text-white">⭐ MVP - MIGLIOR GIOCATORE</h3>
+                    </div>
+                    <div class="p-6 flex flex-col md:flex-row items-center gap-6">
+                        ${bestPlayer.Id ? `<img src="https://content.fantacalcio.it/web/campioncini/20/card/${bestPlayer.Id}.png?v=466" alt="${bestPlayer.Name}" class="w-32 h-40 object-cover rounded-xl border-2 border-purple-500" onerror="this.style.display='none'">` : ''}
+                        <div class="flex-1 text-center md:text-left">
+                            <h4 class="text-3xl font-black text-white mb-2">${bestPlayer.Name}</h4>
+                            <p class="text-purple-300 mb-4">${bestPlayer.R && ruoli[bestPlayer.R] ? ruoli[bestPlayer.R].nome : 'N/A'}</p>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div class="bg-yellow-500/20 border border-yellow-500 rounded-lg p-3 text-center">
+                                    <div class="text-xs text-yellow-400">FANTAMEDIA</div>
+                                    <div class="text-2xl font-bold text-yellow-400">${bestPlayer.Fm?.toFixed(2) || '0.00'}</div>
+                                </div>
+                                <div class="bg-blue-500/20 border border-blue-500 rounded-lg p-3 text-center">
+                                    <div class="text-xs text-blue-400">PRESENZE</div>
+                                    <div class="text-2xl font-bold text-blue-400">${bestPlayer.Pv || 0}</div>
+                                </div>
+                                <div class="bg-green-500/20 border border-green-500 rounded-lg p-3 text-center">
+                                    <div class="text-xs text-green-400">GOL</div>
+                                    <div class="text-2xl font-bold text-green-400">${bestPlayer.Gf || 0}</div>
+                                </div>
+                                <div class="bg-purple-500/20 border border-purple-500 rounded-lg p-3 text-center">
+                                    <div class="text-xs text-purple-400">ASSIST</div>
+                                    <div class="text-2xl font-bold text-purple-400">${bestPlayer.Ass || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Top Scorer e Assistman
+        html += `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card bg-green-950/30 border border-green-500">
+                    <div class="bg-green-600 p-3 rounded-t-xl">
+                        <h3 class="font-bold text-white">⚽ TOP SCORER</h3>
+                    </div>
+                    <div class="p-4 text-center">
+                        <h4 class="text-2xl font-bold text-white">${topScorer?.Name || 'N/A'}</h4>
+                        <div class="text-5xl font-black text-green-400 my-2">${topScorer?.Gf || 0}</div>
+                        <div class="text-gray-400">gol in ${topScorer?.Pv || 0} presenze</div>
+                    </div>
+                </div>
+                <div class="card bg-cyan-950/30 border border-cyan-500">
+                    <div class="bg-cyan-600 p-3 rounded-t-xl">
+                        <h3 class="font-bold text-white">🎯 TOP ASSISTMAN</h3>
+                    </div>
+                    <div class="p-4 text-center">
+                        <h4 class="text-2xl font-bold text-white">${topAssistman?.Name || 'N/A'}</h4>
+                        <div class="text-5xl font-black text-cyan-400 my-2">${topAssistman?.Ass || 0}</div>
+                        <div class="text-gray-400">assist in ${topAssistman?.Pv || 0} presenze</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        content.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Errore nel caricamento delle statistiche:', error);
+        content.innerHTML = '<p class="text-red-400 text-center py-4">Errore nel caricamento delle statistiche</p>';
+    }
+};
+
+/**
+ * Chiude il modal delle statistiche squadra
+ */
+export const closeTeamStatsModal = () => {
+    const modal = document.getElementById('team-stats-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = '';
+        document.body.style.overflow = '';
+    }
+};
+
+// ===================================
 // ESPORTAZIONI WINDOW
 // ===================================
 
@@ -623,3 +890,5 @@ window.renderHistoricResults = renderHistoricResults;
 window.renderOpenMatches = renderOpenMatches;
 window.renderPlacedBets = renderPlacedBets;
 window.renderStatistics = renderStatistics;
+window.showTeamStats = showTeamStats;
+window.closeTeamStatsModal = closeTeamStatsModal;
