@@ -65,42 +65,43 @@ export const getTeamLogo = (teamName) => {
 // =================================== 
 
 export const SERIE_A_DATES = {
-    1: '2025-09-13',   // Giornata Fanta 1 = Serie A 3 (13-15 settembre)
-    2: '2025-09-20',   // Giornata Fanta 2 = Serie A 4
-    3: '2025-09-27',   // etc.
-    4: '2025-10-04',
-    5: '2025-10-18',
-    6: '2025-10-25',
-    7: '2025-11-01',
-    8: '2025-11-08',
-    9: '2025-11-22',
-    10: '2025-11-29',
-    11: '2025-12-06',
-    12: '2025-12-13',
-    13: '2025-12-20',
-    14: '2025-12-29',  // Infrasettimanale
-    15: '2026-01-05',
-    16: '2026-01-12',
-    17: '2026-01-19',
-    18: '2026-01-26',
-    19: '2026-02-02',
-    20: '2026-02-09',
-    21: '2026-02-16',
-    22: '2026-02-23',
-    23: '2026-03-02',
-    24: '2026-03-09',
-    25: '2026-03-16',
-    26: '2026-03-23',
-    27: '2026-04-06',
-    28: '2026-04-13',
-    29: '2026-04-20',
-    30: '2026-04-27',
-    31: '2026-05-04',
-    32: '2026-05-11',
-    33: '2026-05-18',
-    34: '2026-05-25',
-    35: '2026-05-31',  // Ultima giornata
-    36: '2026-05-31'   // Giornata Fanta 36 = Serie A 38
+    // Giornata Fantacalcio -> Data (Serie A giornata = Fanta + 2)
+    1: '2025-09-13',   // Fanta G.1 = Serie A G.3 (13-14 settembre)
+    2: '2025-09-19',   // Fanta G.2 = Serie A G.4 (19-20 settembre)
+    3: '2025-09-27',   // Fanta G.3 = Serie A G.5 (27-28 settembre)
+    4: '2025-10-03',   // Fanta G.4 = Serie A G.6 (3-4 ottobre)
+    5: '2025-10-18',   // Fanta G.5 = Serie A G.7 (18-19 ottobre)
+    6: '2025-10-24',   // Fanta G.6 = Serie A G.8 (24-25 ottobre)
+    7: '2025-10-28',   // Fanta G.7 = Serie A G.9 (28-29 ottobre)
+    8: '2025-11-01',   // Fanta G.8 = Serie A G.10 (1-2 novembre)
+    9: '2025-11-07',   // Fanta G.9 = Serie A G.11 (7-8 novembre)
+    10: '2025-11-22',  // Fanta G.10 = Serie A G.12 (22-23 novembre)
+    11: '2025-11-28',  // Fanta G.11 = Serie A G.13 (28-29 novembre)
+    12: '2025-12-06',  // Fanta G.12 = Serie A G.14 (6-7 dicembre)
+    13: '2025-12-12',  // Fanta G.13 = Serie A G.15 (12-13 dicembre)
+    14: '2025-12-20',  // Fanta G.14 = Serie A G.16 (20-21 dicembre)
+    15: '2025-12-27',  // Fanta G.15 = Serie A G.17 (27-28 dicembre)
+    16: '2026-01-02',  // Fanta G.16 = Serie A G.18 (2-3 gennaio)
+    17: '2026-01-06',  // Fanta G.17 = Serie A G.19 (6-7 gennaio)
+    18: '2026-01-10',  // Fanta G.18 = Serie A G.20 (10-11 gennaio)
+    19: '2026-01-16',  // Fanta G.19 = Serie A G.21 (16-17 gennaio)
+    20: '2026-01-23',  // Fanta G.20 = Serie A G.22 (23-24 gennaio)
+    21: '2026-02-01',  // Fanta G.21 = Serie A G.23 (1-2 febbraio)
+    22: '2026-02-08',  // Fanta G.22 = Serie A G.24 (8-9 febbraio)
+    23: '2026-02-25',  // Fanta G.23 = Serie A G.25 (25-26 febbraio)
+    24: '2026-02-22',  // Fanta G.24 = Serie A G.26 (22-23 febbraio)
+    25: '2026-03-01',  // Fanta G.25 = Serie A G.27 (1-2 marzo)
+    26: '2026-03-08',  // Fanta G.26 = Serie A G.28 (8-9 marzo)
+    27: '2026-03-15',  // Fanta G.27 = Serie A G.29 (15-16 marzo)
+    28: '2026-03-22',  // Fanta G.28 = Serie A G.30 (22-23 marzo)
+    29: '2026-04-04',  // Fanta G.29 = Serie A G.31 (4-5 aprile)
+    30: '2026-04-12',  // Fanta G.30 = Serie A G.32 (12-13 aprile)
+    31: '2026-04-19',  // Fanta G.31 = Serie A G.33 (19-20 aprile)
+    32: '2026-04-26',  // Fanta G.32 = Serie A G.34 (26-27 aprile)
+    33: '2026-05-03',  // Fanta G.33 = Serie A G.35 (3-4 maggio)
+    34: '2026-05-10',  // Fanta G.34 = Serie A G.36 (10-11 maggio)
+    35: '2026-05-17',  // Fanta G.35 = Serie A G.37 (17-18 maggio)
+    36: '2026-05-24'   // Fanta G.36 = Serie A G.38 (24-25 maggio)
 };
 
 /**
