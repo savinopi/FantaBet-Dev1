@@ -12,7 +12,7 @@ import {
     getTeamsCollectionRef,
     getBonusCollectionRef
 } from './firebase-config.js';
-import { messageBox, showProgressBar, hideProgressBar, updateProgress } from './utils.js';
+import { messageBox, showProgressBar, hideProgressBar, updateProgressBar, updateProgress } from './utils.js';
 import { getTeamLogo } from './config.js';
 import { getIsUserAdmin, getCurrentUserProfile } from './auth.js';
 import { getAllMatches, getAllResults } from './state.js';

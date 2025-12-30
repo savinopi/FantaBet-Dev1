@@ -101,9 +101,13 @@ export const hideProgressBar = () => {
     progressStartTime = null;
 };
 
+// Alias per compatibilità con codice esistente
+export const updateProgress = updateProgressBar;
+
 // Esponi globalmente
 window.showProgressBar = showProgressBar;
 window.updateProgressBar = updateProgressBar;
+window.updateProgress = updateProgressBar;
 window.hideProgressBar = hideProgressBar;
 
 // ===================================

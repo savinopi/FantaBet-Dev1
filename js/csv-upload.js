@@ -20,9 +20,9 @@ import {
     getPlayersCollectionRef,
     getSquadsCollectionRef,
     getPlayerStatsCollectionRef,
-    getTeamCollectionRef
+    getTeamsCollectionRef
 } from './firebase-config.js';
-import { messageBox, showProgressBar, hideProgressBar, updateProgress } from './utils.js';
+import { messageBox, showProgressBar, hideProgressBar, updateProgressBar, updateProgress } from './utils.js';
 import { getIsUserAdmin } from './auth.js';
 import { getAllTeams, getAllResults, setAllResults } from './state.js';
 

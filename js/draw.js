@@ -8,7 +8,8 @@ import {
     getDocs,
     getPlayerStatsCollectionRef
 } from './firebase-config.js';
-import { messageBox, getTeamLogo } from './utils.js';
+import { messageBox } from './utils.js';
+import { getTeamLogo } from './config.js';
 import { getIsUserAdmin } from './auth.js';
 import { getAllTeams } from './state.js';
 

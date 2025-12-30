@@ -11,7 +11,8 @@ import {
     getPlayerStatsCollectionRef,
     getPlayersCollectionRef
 } from './firebase-config.js';
-import { messageBox, showProgressBar, hideProgressBar, updateProgress, getTeamLogo } from './utils.js';
+import { messageBox, showProgressBar, hideProgressBar, updateProgressBar, updateProgress } from './utils.js';
+import { getTeamLogo } from './config.js';
 import { getIsUserAdmin } from './auth.js';
 import { getAllResults } from './state.js';
 
