@@ -535,8 +535,89 @@
                         
                         <!-- Tab Gestione Dati -->
                         <div id="admin-tab-data-content" class="admin-tab-content hidden">
-                            <h3 class="text-lg font-bold text-blue-400 mb-4">Gestione Dati</h3>
-                            <p class="text-gray-400">Sezione per importazione/esportazione dati CSV</p>
+                            <h3 class="text-xl font-bold mb-4 text-yellow-400">Caricamento Dati CSV</h3>
+                            <div class="flex flex-wrap items-center gap-4 mb-4">
+                                <label for="csv-file-input" class="sr-only">Seleziona file CSV</label>
+                                <input type="file" id="csv-file-input" class="hidden" onchange="handleFileSelect()" accept=".csv" aria-label="Seleziona file CSV">
+                                <button onclick="triggerFileInput()" class="btn-primary">Seleziona File Calendario (.csv)</button>
+                                <button id="upload-button" onclick="confirmUpload()" class="btn-secondary" disabled>Carica File</button>
+                                <span id="file-name-display" class="text-gray-400" aria-live="polite">Nessun file selezionato.</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-2">
+                                Il file CSV deve avere il delimitatore ';' e il seguente tracciato: Giornata;Casa;P.Casa;P.Ospite;Ospite;Risultato.
+                                Le partite con risultato (es. '2-1') verranno importate come risultati storici.
+                                Le partite con risultato '-' verranno importate come partite aperte per le scommesse.
+                            </p>
+                            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg px-4 py-2 mb-6">
+                                <p class="text-xs text-blue-300">
+                                    <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    <strong>Date automatiche:</strong> Il fantacalcio è iniziato alla 3ª giornata di Serie A 2025/26. Le date vengono mappate automaticamente (Giornata 1 → 13 set 2025, Giornata 2 → 20 set 2025, ecc.)
+                                </p>
+                            </div>
+                            
+                            <!-- Tabella dati CSV caricati -->
+                            <div class="border-t border-gray-700 pt-6">
+                                <h4 class="text-lg font-semibold mb-4 text-green-400">Dati Caricati</h4>
+                                <div id="csv-data-container" class="overflow-x-auto">
+                                    <p class="text-gray-500">Nessun dato da visualizzare. Carica un file CSV.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Sezione Caricamento Rose -->
+                            <div class="border-t border-gray-700 pt-6 mt-6">
+                                <h4 class="text-lg font-semibold mb-4 text-purple-400">Caricamento Rose Squadre</h4>
+                                <div class="flex flex-wrap items-center gap-4 mb-4">
+                                    <label for="squads-csv-file-input" class="sr-only">Seleziona file CSV Rose</label>
+                                    <input type="file" id="squads-csv-file-input" class="hidden" onchange="handleSquadsFileSelect()" accept=".csv" aria-label="Seleziona file CSV Rose">
+                                    <button onclick="triggerSquadsFileInput()" class="btn-primary">Seleziona File Rose (.csv)</button>
+                                    <button id="upload-squads-button" onclick="confirmSquadsUpload()" class="btn-secondary" disabled>Carica Rose</button>
+                                    <span id="squads-file-name-display" class="text-gray-400" aria-live="polite">Nessun file selezionato.</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-4">
+                                    Il file CSV deve avere il delimitatore ';' e il seguente tracciato: Squadra;Ruolo;Calciatore;Squadra (Serie A);Costo.
+                                    Verranno caricate tutte le rose con i calciatori di ogni squadra.
+                                </p>
+                                <div id="squads-data-container" class="overflow-x-auto">
+                                    <p class="text-gray-500 text-sm">Nessun dato rose caricato.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Sezione Caricamento Statistiche Calciatori -->
+                            <div class="border-t border-gray-700 pt-6 mt-6">
+                                <h4 class="text-lg font-semibold mb-4 text-blue-400">Caricamento Statistiche Calciatori</h4>
+                                <div class="flex flex-wrap items-center gap-4 mb-4">
+                                    <label for="stats-csv-file-input" class="sr-only">Seleziona file CSV Statistiche</label>
+                                    <input type="file" id="stats-csv-file-input" class="hidden" onchange="handleStatsFileSelect()" accept=".csv" aria-label="Seleziona file CSV Statistiche">
+                                    <button onclick="triggerStatsFileInput()" class="btn-primary">Seleziona File Statistiche (.csv)</button>
+                                    <button id="upload-stats-button" onclick="confirmStatsUpload()" class="btn-secondary" disabled>Carica Statistiche</button>
+                                    <span id="stats-file-name-display" class="text-gray-400" aria-live="polite">Nessun file selezionato.</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-2">
+                                    Il file CSV deve avere il delimitatore ';' e contenere: Id;R;Nome;Squadra;Pv;Mv;Fm;Gf;Gs;Rp;Rc;R+;R-;Ass;Amm;Esp;Au
+                                </p>
+                                <p class="text-xs text-gray-400 mb-4">
+                                    <strong>Legenda:</strong> R=Ruolo, Pv=Partite a voto, Mv=Media voto, Fm=Fantamedia, Gf=Gol fatti, Gs=Gol subiti, 
+                                    Rp=Rigori parati, Rc=Rigori concessi, R+=Rigori segnati, R-=Rigori sbagliati, Ass=Assist, Amm=Ammonizioni, Esp=Espulsioni, Au=Autogol
+                                </p>
+                                <!-- Progress Bar Statistiche -->
+                                <div id="stats-progress" class="mb-4 hidden">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span id="stats-progress-status" class="text-sm text-gray-300">Inizializzazione...</span>
+                                        <span id="stats-progress-percentage" class="text-sm font-bold text-blue-400">0%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                                        <div id="stats-progress-bar-fill" class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div id="stats-summary-container" class="mb-4">
+                                    <!-- Riepilogo statistiche caricate -->
+                                </div>
+                                <div id="stats-data-container" class="overflow-x-auto">
+                                    <p class="text-gray-500 text-sm">Nessuna statistica caricata.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
