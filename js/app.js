@@ -94,7 +94,11 @@ import {
     recordPrediction,
     updateGiornataBetButton,
     placeBetForGiornata,
-    setupGlobalBetsFunctions
+    setupGlobalBetsFunctions,
+    setOddsDependencies,
+    calculateOdds,
+    calculateStandings,
+    calculateTeamStats
 } from './bets.js';
 
 import {
@@ -103,6 +107,56 @@ import {
     renderStatistics,
     renderStandingsTrend
 } from './rendering.js';
+
+// Import nuovi moduli
+import {
+    loadBonusData,
+    saveBonusData,
+    updateBonusTotal,
+    updateBonusUsage,
+    loadUserBonuses,
+    saveUserBonusData,
+    toggleBonusRequest,
+    dismissBonusNotification,
+    toggleAdditionalStats,
+    setBonusDependencies
+} from './bonus.js';
+
+import {
+    startDraw,
+    drawNextTeam,
+    resetDraw,
+    copyLastDraw,
+    getTeamStats,
+    setDrawDependencies
+} from './draw.js';
+
+import {
+    triggerFileInput,
+    handleFileSelect,
+    confirmUpload,
+    processNewFile,
+    processUploadedData,
+    triggerSquadsFileInput,
+    handleSquadsFileSelect,
+    confirmSquadsUpload,
+    processSquadsFile,
+    triggerStatsFileInput,
+    handleStatsFileSelect,
+    confirmStatsUpload,
+    processStatsFile
+} from './csv-upload.js';
+
+import {
+    loadPlayerStats,
+    sortPlayerStats,
+    filterPlayerStats,
+    loadPlayerLeaderboards,
+    loadSquadsData,
+    filterSquadView,
+    loadLeagueStatsData,
+    loadStandingsTrendChart
+} from './player-stats.js';
 
 // ===================================
 // VARIABILI MODULO
@@ -130,6 +184,24 @@ const setupFirebase = async () => {
             isDeadlinePassed: isDeadlinePassed,
             checkPendingBonusRequests: () => {}, // placeholder
             renderAdminBetsList: () => {} // placeholder
+        });
+        
+        // Setup dipendenze per odds calculation
+        setOddsDependencies({
+            getAllResults: () => state.getAllResults()
+        });
+        
+        // Setup dipendenze per bonus.js
+        setBonusDependencies({
+            loadActiveGiornata: loadActiveGiornata,
+            getGiornataDeadline: getGiornataDeadline,
+            isActiveGiornata: isActiveGiornata,
+            calculateStandings: calculateStandings
+        });
+        
+        // Setup dipendenze per draw.js
+        setDrawDependencies({
+            calculateStandings: calculateStandings
         });
         
         document.getElementById('auth-status').textContent = 'In attesa di autenticazione...';
@@ -421,6 +493,12 @@ const getGiornataDeadline = async (giornata) => {
 const isDeadlinePassed = async (giornata) => {
     const { deadline } = await getGiornataDeadline(giornata);
     return new Date() >= deadline;
+};
+
+// Verifica se una giornata è quella attiva
+const isActiveGiornata = async (giornata) => {
+    const activeGiornata = await loadActiveGiornata();
+    return activeGiornata === parseInt(giornata, 10);
 };
 
 const determineLastCompletedGiornata = () => {

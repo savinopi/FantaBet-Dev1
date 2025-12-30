@@ -1039,9 +1039,276 @@ export const setupAdminBetsListener = (giornataNum, allUsers) => {
     setAdminBetsUnsubscribe(unsubscribe);
 };
 
+// ==================== CALCOLO QUOTE ====================
+
+// Import dipendenze esterne per le quote
+let getAllResults = null;
+
+/**
+ * Imposta le dipendenze per il calcolo quote
+ */
+export const setOddsDependencies = (deps) => {
+    if (deps.getAllResults) getAllResults = deps.getAllResults;
+};
+
+/**
+ * Calcola le statistiche di una squadra
+ */
+export const calculateTeamStats = (teamName) => {
+    const allResults = getAllResults ? getAllResults() : [];
+    
+    const homeMatches = allResults.filter(r => r.homeTeam === teamName);
+    const awayMatches = allResults.filter(r => r.awayTeam === teamName);
+    const allMatches = [...homeMatches, ...awayMatches];
+
+    if (allMatches.length === 0) {
+        return {
+            homeWinRate: 0.35,
+            awayWinRate: 0.25,
+            overallWinRate: 0.30,
+            drawRate: 0.30,
+            points: 0,
+            matchesPlayed: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
+            goalDifference: 0
+        };
+    }
+
+    // Statistiche in casa
+    let homeWins = homeMatches.filter(r => r.result === '1').length;
+    let homeDraws = homeMatches.filter(r => r.result === 'X').length;
+    let homeLosses = homeMatches.filter(r => r.result === '2').length;
+    
+    // Statistiche in trasferta
+    let awayWins = awayMatches.filter(r => r.result === '2').length;
+    let awayDraws = awayMatches.filter(r => r.result === 'X').length;
+    let awayLosses = awayMatches.filter(r => r.result === '1').length;
+    
+    // Statistiche totali
+    let totalWins = homeWins + awayWins;
+    let totalDraws = homeDraws + awayDraws;
+    let totalPoints = (totalWins * 3) + totalDraws;
+
+    // Calcola gol fatti e subiti
+    let goalsFor = 0;
+    let goalsAgainst = 0;
+    let totalFantasyPoints = 0;
+    
+    homeMatches.forEach(r => {
+        if (r.score && r.score.includes('-')) {
+            const [home, away] = r.score.split('-').map(g => parseInt(g.trim(), 10));
+            if (!isNaN(home) && !isNaN(away)) {
+                goalsFor += home;
+                goalsAgainst += away;
+            }
+        }
+        if (r.homePoints) {
+            totalFantasyPoints += r.homePoints;
+        }
+    });
+    
+    awayMatches.forEach(r => {
+        if (r.score && r.score.includes('-')) {
+            const [home, away] = r.score.split('-').map(g => parseInt(g.trim(), 10));
+            if (!isNaN(home) && !isNaN(away)) {
+                goalsFor += away;
+                goalsAgainst += home;
+            }
+        }
+        if (r.awayPoints) {
+            totalFantasyPoints += r.awayPoints;
+        }
+    });
+    
+    const goalDifference = goalsFor - goalsAgainst;
+
+    return {
+        homeWinRate: homeMatches.length > 0 ? homeWins / homeMatches.length : 0.35,
+        awayWinRate: awayMatches.length > 0 ? awayWins / awayMatches.length : 0.25,
+        overallWinRate: allMatches.length > 0 ? totalWins / allMatches.length : 0.30,
+        drawRate: allMatches.length > 0 ? totalDraws / allMatches.length : 0.25,
+        points: totalPoints,
+        matchesPlayed: allMatches.length,
+        wins: totalWins,
+        draws: totalDraws,
+        losses: homeLosses + awayLosses,
+        goalsFor: goalsFor,
+        goalsAgainst: goalsAgainst,
+        goalDifference: goalDifference,
+        fantasyPoints: totalFantasyPoints
+    };
+};
+
+/**
+ * Applica il margine del bookmaker alle quote
+ */
+const adjustOddsForMargin = (q1, qX, q2, targetMargin) => {
+    // Calcola le probabilità implicite attuali
+    const p1 = 1 / q1;
+    const pX = 1 / qX;
+    const p2 = 1 / q2;
+    
+    const currentSum = p1 + pX + p2;
+    const targetSum = 1 + targetMargin;
+    
+    // Scala uniformemente le probabilità
+    const scaleFactor = targetSum / currentSum;
+    
+    return {
+        '1': parseFloat((1 / (p1 * scaleFactor)).toFixed(2)),
+        'X': parseFloat((1 / (pX * scaleFactor)).toFixed(2)),
+        '2': parseFloat((1 / (p2 * scaleFactor)).toFixed(2)),
+        overround: ((p1 + pX + p2) * 100 - 100).toFixed(2) + '%'
+    };
+};
+
+/**
+ * Calcola le quote per una partita
+ */
+export const calculateOdds = (homeTeam, awayTeam) => {
+    const allResults = getAllResults ? getAllResults() : [];
+    
+    // 1. Conteggio scontri diretti
+    const matchesAgainst = allResults.filter(r =>
+        (r.homeTeam === homeTeam && r.awayTeam === awayTeam) ||
+        (r.homeTeam === awayTeam && r.awayTeam === homeTeam)
+    );
+
+    let homeTeamWins = 0;
+    let awayTeamWins = 0;
+    let draws = 0;
+
+    matchesAgainst.forEach(r => {
+        if (r.homeTeam === homeTeam && r.awayTeam === awayTeam) {
+            if (r.result === '1') homeTeamWins++;
+            else if (r.result === 'X') draws++;
+            else if (r.result === '2') awayTeamWins++;
+        } else if (r.homeTeam === awayTeam && r.awayTeam === homeTeam) {
+            if (r.result === '1') awayTeamWins++;
+            else if (r.result === 'X') draws++;
+            else if (r.result === '2') homeTeamWins++;
+        }
+    });
+
+    const totalEncounters = homeTeamWins + awayTeamWins + draws;
+
+    // 2. Calcola statistiche generali delle squadre
+    const homeStats = calculateTeamStats(homeTeam);
+    const awayStats = calculateTeamStats(awayTeam);
+
+    // 3. Calcola fattore di forza basato sulla classifica
+    const maxPoints = Math.max(homeStats.points, awayStats.points, 1);
+    const homeStrength = homeStats.matchesPlayed > 0 ? homeStats.points / (homeStats.matchesPlayed * 3) : 0.5;
+    const awayStrength = awayStats.matchesPlayed > 0 ? awayStats.points / (awayStats.matchesPlayed * 3) : 0.5;
+    
+    // Fattore casa: bonus del 10% per la squadra di casa
+    const homeBonus = 0.10;
+
+    // 4. Combina scontri diretti con statistiche generali
+    let p1, pX, p2;
+    
+    if (totalEncounters === 0) {
+        // Nessun scontro diretto: usa statistiche generali + classifica
+        const homeAdjusted = homeStrength + homeBonus;
+        const awayAdjusted = awayStrength;
+        
+        p1 = homeStats.homeWinRate * 0.5 + homeAdjusted * 0.5;
+        p2 = awayStats.awayWinRate * 0.5 + awayAdjusted * 0.5;
+        pX = Math.max(0.20, Math.min(0.35, (homeStats.drawRate + awayStats.drawRate) / 2));
+    } else {
+        // Combina scontri diretti (50%) con statistiche generali (30%) e classifica (20%)
+        const directP1 = homeTeamWins / totalEncounters;
+        const directP2 = awayTeamWins / totalEncounters;
+        const directPX = draws / totalEncounters;
+        
+        const homeAdjusted = homeStrength + homeBonus;
+        const awayAdjusted = awayStrength;
+        
+        const generalP1 = homeStats.homeWinRate * 0.6 + homeAdjusted * 0.4;
+        const generalP2 = awayStats.awayWinRate * 0.6 + awayAdjusted * 0.4;
+        const generalPX = (homeStats.drawRate + awayStats.drawRate) / 2;
+        
+        p1 = directP1 * 0.5 + generalP1 * 0.5;
+        p2 = directP2 * 0.5 + generalP2 * 0.5;
+        pX = directPX * 0.5 + generalPX * 0.5;
+        
+        pX = Math.max(0.15, Math.min(0.40, pX));
+    }
+
+    // Normalizza le probabilità
+    const sum = p1 + pX + p2 || 1;
+    p1 /= sum; 
+    pX /= sum; 
+    p2 /= sum;
+
+    // Converti probabilità in quote pure con limiti
+    const q1Pure = Math.min(15, Math.max(1.20, 1 / Math.max(p1, 0.08)));
+    const qXPure = Math.min(8, Math.max(2.50, 1 / Math.max(pX, 0.15)));
+    const q2Pure = Math.min(20, Math.max(1.20, 1 / Math.max(p2, 0.06)));
+
+    // Applica il margine del bookmaker
+    const TARGET_MARGIN = 0.08;
+    const adjusted = adjustOddsForMargin(q1Pure, qXPure, q2Pure, TARGET_MARGIN);
+
+    return {
+        '1': adjusted['1'].toFixed(2),
+        'X': adjusted['X'].toFixed(2),
+        '2': adjusted['2'].toFixed(2),
+        overround: adjusted.overround
+    };
+};
+
+/**
+ * Calcola la classifica completa
+ */
+export const calculateStandings = () => {
+    const allResults = getAllResults ? getAllResults() : [];
+    const standings = [];
+    const teamsSet = new Set();
+    
+    // Raccogli tutte le squadre uniche
+    allResults.forEach(r => {
+        teamsSet.add(r.homeTeam);
+        teamsSet.add(r.awayTeam);
+    });
+    
+    // Calcola statistiche per ogni squadra
+    teamsSet.forEach(teamName => {
+        const stats = calculateTeamStats(teamName);
+        standings.push({
+            team: teamName,
+            points: stats.points,
+            played: stats.matchesPlayed,
+            wins: stats.wins,
+            draws: stats.draws,
+            losses: stats.losses,
+            goalsFor: stats.goalsFor,
+            goalsAgainst: stats.goalsAgainst,
+            goalDifference: stats.goalDifference,
+            fantasyPoints: stats.fantasyPoints || 0
+        });
+    });
+    
+    // Ordina per punti (decrescente), poi differenza reti, poi gol fatti
+    standings.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+        return b.goalsFor - a.goalsFor;
+    });
+    
+    return standings;
+};
+
 // Esporta funzioni per uso globale (window)
 export const setupGlobalBetsFunctions = () => {
     window.recordPrediction = recordPrediction;
     window.updateGiornataBetButton = updateGiornataBetButton;
     window.placeBetForGiornata = placeBetForGiornata;
+    window.calculateOdds = calculateOdds;
+    window.calculateStandings = calculateStandings;
+    window.calculateTeamStats = calculateTeamStats;
 };

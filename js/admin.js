@@ -10,14 +10,24 @@ import {
     updateDoc,
     setDoc,
     getDoc,
+    addDoc,
+    deleteDoc,
     writeBatch,
+    query,
+    where,
     onSnapshot,
     getUsersCollectionRef,
     getSquadsCollectionRef,
     getScheduleCollectionRef,
-    getGiornataBetsCollectionRef
+    getGiornataBetsCollectionRef,
+    getTeamCollectionRef,
+    getResultsCollectionRef,
+    getMatchesCollectionRef,
+    getPlayersCollectionRef,
+    getPlayerStatsCollectionRef
 } from './firebase-config.js';
-import { messageBox } from './utils.js';
+import { messageBox, showProgressBar, hideProgressBar, updateProgress } from './utils.js';
+import { calculateOdds } from './bets.js';
 import { 
     getAllUsersForAdmin,
     setAllUsersForAdmin,
@@ -563,6 +573,638 @@ export const updateUserBet = async (betId) => {
     }
 };
 
+// ==================== FUNZIONI DI PULIZIA DATABASE ====================
+
+/**
+ * Cancella tutti i dati del database (risultati, squadre, partite, scommesse)
+ */
+export const clearHistoricResultsAndTeams = async (confirmed) => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return; 
+    
+    const confirmModal = document.getElementById('confirm-modal');
+    
+    if (!confirmed) {
+        confirmModal.classList.remove('hidden');
+        return;
+    }
+    
+    confirmModal.classList.add('hidden');
+    
+    showProgressBar('Reset Totale Database');
+
+    const collectionsToClear = [
+        getTeamCollectionRef(), 
+        getResultsCollectionRef(), 
+        getMatchesCollectionRef(),
+        getGiornataBetsCollectionRef()
+    ];
+    
+    let totalDeleted = 0;
+    let totalDocs = 0;
+
+    try {
+        // Prima conta tutti i documenti
+        const snapshots = await Promise.all(collectionsToClear.map(ref => getDocs(ref)));
+        totalDocs = snapshots.reduce((sum, snapshot) => sum + snapshot.docs.length, 0);
+        
+        updateProgress(10, 'Inizio cancellazione...', 0, totalDocs);
+        
+        let currentIndex = 0;
+        for (let i = 0; i < collectionsToClear.length; i++) {
+            const collectionRef = collectionsToClear[i];
+            const snapshot = snapshots[i];
+            let collectionDeleted = 0;
+            
+            // Cancella ogni documento uno per uno
+            for (const docSnapshot of snapshot.docs) {
+                await deleteDoc(doc(collectionRef, docSnapshot.id));
+                collectionDeleted++;
+                totalDeleted++;
+                currentIndex++;
+                
+                const progress = 10 + (currentIndex / totalDocs) * 85;
+                updateProgress(progress, `Cancellazione ${collectionRef.id}...`, currentIndex, totalDocs);
+            }
+            console.log(`Cancellati ${collectionDeleted} documenti dalla collezione: ${collectionRef.id}`);
+        }
+        
+        updateProgress(100, 'Completato!', totalDocs, totalDocs);
+        
+        setTimeout(() => {
+            hideProgressBar();
+            messageBox(`Cancellazione completa! Eliminati ${totalDeleted} documenti totali. L'app è stata resettata.`);
+        }, 500);
+        
+    } catch (error) {
+        console.error("Errore durante la cancellazione dei dati:", error);
+        hideProgressBar();
+        messageBox(`Errore grave durante la cancellazione. Controlla i permessi di scrittura/cancellazione su Firebase. Errore: ${error.message}`);
+    }
+};
+
+/**
+ * Cancella tutti i risultati storici
+ */
+export const clearHistoricResults = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTI i risultati storici? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar('Cancellazione Risultati Storici');
+    
+    try {
+        const snapshot = await getDocs(getResultsCollectionRef());
+        const totalDocs = snapshot.docs.length;
+        let deletedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(doc(getResultsCollectionRef(), docSnapshot.id));
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgress(progress, `Cancellazione in corso...`, deletedCount, totalDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellati ${deletedCount} risultati storici.`);
+        console.log(`Cancellati ${deletedCount} risultati storici`);
+        
+    } catch (error) {
+        console.error("Errore cancellazione risultati storici:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+/**
+ * Cancella tutte le partite aperte
+ */
+export const clearOpenMatches = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTE le partite aperte? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar('Cancellazione Partite Aperte');
+    
+    try {
+        const q = query(getMatchesCollectionRef(), where('status', '==', 'open'));
+        const snapshot = await getDocs(q);
+        const totalDocs = snapshot.docs.length;
+        let deletedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(doc(getMatchesCollectionRef(), docSnapshot.id));
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgress(progress, `Cancellazione in corso...`, deletedCount, totalDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellate ${deletedCount} partite aperte.`);
+        console.log(`Cancellate ${deletedCount} partite aperte`);
+        
+    } catch (error) {
+        console.error("Errore cancellazione partite aperte:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+/**
+ * Cancella tutte le scommesse
+ */
+export const clearAllBets = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTE le scommesse? I crediti NON verranno restituiti agli utenti. Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar('Cancellazione Scommesse');
+    
+    try {
+        const snapshot = await getDocs(getGiornataBetsCollectionRef());
+        const totalDocs = snapshot.docs.length;
+        let deletedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(doc(getGiornataBetsCollectionRef(), docSnapshot.id));
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgress(progress, `Cancellazione in corso...`, deletedCount, totalDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellate ${deletedCount} scommesse.`);
+        console.log(`Cancellate ${deletedCount} scommesse`);
+        
+    } catch (error) {
+        console.error("Errore cancellazione scommesse:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+/**
+ * Reset crediti di tutti gli utenti a 100
+ */
+export const resetUserCredits = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler reimpostare i crediti di TUTTI gli utenti a 100? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar('Reset Crediti Utenti');
+    
+    try {
+        const snapshot = await getDocs(getUsersCollectionRef());
+        const totalDocs = snapshot.docs.length;
+        let updatedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await updateDoc(doc(getUsersCollectionRef(), docSnapshot.id), { credits: 100 });
+            updatedCount++;
+            
+            const progress = (updatedCount / totalDocs) * 100;
+            updateProgress(progress, `Reset in corso...`, updatedCount, totalDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Crediti reimpostati per ${updatedCount} utenti.`);
+        console.log(`Crediti reimpostati per ${updatedCount} utenti`);
+    } catch (error) {
+        console.error("Errore reset crediti:", error);
+        hideProgressBar();
+        messageBox(`Errore durante il reset: ${error.message}`);
+    }
+};
+
+/**
+ * Cancella tutte le squadre
+ */
+export const clearAllTeams = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTE le squadre? Questa azione è irreversibile e potrebbe causare problemi se ci sono partite o risultati associati.')) {
+        return;
+    }
+    
+    showProgressBar('Cancellazione Squadre');
+    
+    try {
+        const snapshot = await getDocs(getTeamCollectionRef());
+        const totalDocs = snapshot.docs.length;
+        let deletedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(doc(getTeamCollectionRef(), docSnapshot.id));
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgress(progress, `Cancellazione in corso...`, deletedCount, totalDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellate ${deletedCount} squadre.`);
+        console.log(`Cancellate ${deletedCount} squadre`);
+    } catch (error) {
+        console.error("Errore cancellazione squadre:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+// ==================== FUNZIONI GESTIONE PARTITE E RISULTATI ====================
+
+/**
+ * Aggiunge un risultato storico
+ */
+export const addHistoricResult = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    const homeTeam = document.getElementById('historic-home-team').value;
+    const awayTeam = document.getElementById('historic-away-team').value;
+    const result = document.getElementById('historic-result').value;
+    const date = document.getElementById('historic-date').value;
+
+    if (!homeTeam || !awayTeam || !result || !date || homeTeam === awayTeam) {
+        messageBox("Seleziona entrambe le squadre, il risultato e la data. Le squadre non possono essere le stesse.");
+        return;
+    }
+
+    try {
+        await addDoc(getResultsCollectionRef(), {
+            homeTeam,
+            awayTeam,
+            result, // '1', 'X', '2'
+            date,
+            giornata: 'Aggiunta Manuale',
+            score: 'N/A'
+        });
+        messageBox(`Risultato storico ${result} (${homeTeam} vs ${awayTeam}) salvato.`);
+    } catch (error) {
+        console.error("Errore salvataggio risultato storico:", error);
+        messageBox("Errore nel salvataggio del risultato storico.");
+    }
+};
+
+/**
+ * Aggiunge una nuova squadra
+ */
+export const addTeam = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    const teamNameInput = document.getElementById('new-team-name');
+    const teamName = teamNameInput.value.trim();
+    
+    if (!teamName) {
+        messageBox("Inserisci un nome per la squadra.");
+        return;
+    }
+    
+    try {
+        const teamId = teamName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        await setDoc(doc(getTeamCollectionRef(), teamId), {
+            name: teamName
+        });
+        teamNameInput.value = '';
+        messageBox(`Squadra "${teamName}" aggiunta.`);
+    } catch (error) {
+        console.error("Errore salvataggio squadra:", error);
+        messageBox(`Errore nel salvataggio della squadra ${teamName}.`);
+    }
+};
+
+/**
+ * Calcola e salva una nuova partita
+ */
+export const calculateAndSaveMatch = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    const homeTeam = document.getElementById('new-match-home-team').value;
+    const awayTeam = document.getElementById('new-match-away-team').value;
+    const date = document.getElementById('new-match-date').value;
+
+    if (!homeTeam || !awayTeam || homeTeam === awayTeam || !date) {
+        messageBox("Seleziona due squadre diverse e una data.");
+        return;
+    }
+    
+    const odds = calculateOdds(homeTeam, awayTeam);
+    
+    // Recupera tutte le partite aperte e determina la prossima giornata disponibile
+    const openMatchesSnapshot = await getDocs(query(getMatchesCollectionRef(), where('status', '==', 'open')));
+    let nextGiornata = 1;
+    if (!openMatchesSnapshot.empty) {
+        const maxGiornata = openMatchesSnapshot.docs.reduce((max, d) => {
+            const g = parseInt(d.data().giornata || '0', 10) || 0;
+            return Math.max(max, g);
+        }, 0);
+        // prossima giornata libera = max + 1
+        nextGiornata = Math.max(1, maxGiornata + 1);
+    }
+
+    try {
+        await addDoc(getMatchesCollectionRef(), {
+            homeTeam,
+            awayTeam,
+            date,
+            odds, // { '1': 2.50, 'X': 3.00, '2': 3.50 }
+            status: 'open',
+            score: null, // Nuovo campo score, nullo finché non chiusa
+            giornata: nextGiornata.toString(),
+            createdAt: new Date().toISOString()
+        });
+        messageBox(`Partita ${homeTeam} vs ${awayTeam} aperta per la Giornata ${nextGiornata} con quote: 1=${odds['1']}, X=${odds['X']}, 2=${odds['2']}`);
+    } catch (error) {
+        console.error("Errore salvataggio partita:", error);
+        messageBox("Errore nel salvataggio della partita aperta.");
+    }
+};
+
+/**
+ * Chiude una partita e salva il punteggio
+ */
+export const closeMatchAndSaveScore = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+
+    const matchId = document.getElementById('match-to-close-select').value;
+    const finalScore = document.getElementById('final-score-input').value.trim();
+
+    if (!matchId) {
+        messageBox("Seleziona una partita da chiudere.");
+        return;
+    }
+
+    if (!finalScore || !finalScore.match(/^\d+-\d+$/)) {
+         messageBox("Inserisci il punteggio finale nel formato corretto (es: 3-1).");
+         return;
+    }
+    
+    const [homeGoals, awayGoals] = finalScore.split('-').map(g => parseInt(g.trim(), 10));
+
+    let result;
+    if (homeGoals > awayGoals) {
+        result = '1';
+    } else if (homeGoals < awayGoals) {
+        result = '2';
+    } else {
+        result = 'X';
+    }
+
+    try {
+        const matchRef = doc(getMatchesCollectionRef(), matchId);
+        const matchData = (await getDoc(matchRef)).data();
+        const giornata = matchData.giornata;
+        
+        // 1. Chiudi il match
+        await updateDoc(matchRef, {
+            status: 'closed',
+            score: finalScore,
+            result: result
+        });
+
+        // 2. Verifica se tutti i match della giornata sono chiusi
+        const qOpenMatches = query(
+            getMatchesCollectionRef(),
+            where('giornata', '==', giornata),
+            where('status', '==', 'open')
+        );
+        const openMatchesSnap = await getDocs(qOpenMatches);
+
+        // Se non ci sono più partite aperte nella giornata
+        if (openMatchesSnap.empty) {
+            // 3. Liquida tutte le scommesse della giornata
+            const liquidated = await liquidateGiornataBets(giornata);
+            if (liquidated) {
+                messageBox(`Giornata ${giornata} completata! Scommesse liquidate e crediti aggiornati.`);
+            }
+        } else {
+            messageBox(`Partita chiusa: ${finalScore}. Rimangono ancora ${openMatchesSnap.size} partite da chiudere per la giornata ${giornata}.`);
+        }
+
+        document.getElementById('final-score-input').value = '';
+
+    } catch (error) {
+        console.error("Errore chiusura partita:", error);
+        messageBox(`Errore durante la chiusura della partita: ${error.message}`);
+    }
+};
+
+/**
+ * Liquida le scommesse di una giornata
+ */
+export const liquidateGiornataBets = async (giornata) => {
+    try {
+        const qBets = query(
+            getGiornataBetsCollectionRef(),
+            where('giornata', '==', giornata.toString())
+        );
+        const betsSnapshot = await getDocs(qBets);
+        
+        // Ottieni i match chiusi della giornata
+        const qMatches = query(
+            getMatchesCollectionRef(),
+            where('giornata', '==', giornata.toString()),
+            where('status', '==', 'closed')
+        );
+        const matchesSnapshot = await getDocs(qMatches);
+        const closedMatches = new Map(
+            matchesSnapshot.docs.map(doc => [doc.id, doc.data()])
+        );
+
+        // Batch write per aggiornare i crediti degli utenti
+        const batch = writeBatch(db);
+        const userUpdates = new Map();
+
+        // Processa ogni scommessa
+        betsSnapshot.docs.forEach(betDoc => {
+            const bet = betDoc.data();
+            const match = closedMatches.get(bet.matchId);
+            
+            if (match && match.result) {
+                const userId = bet.userId;
+                let creditsChange = -bet.stake;
+                
+                // Se la previsione era corretta
+                if (bet.prediction === match.result) {
+                    const win = bet.stake * parseFloat(bet.odds);
+                    creditsChange += win;
+                }
+
+                userUpdates.set(
+                    userId, 
+                    (userUpdates.get(userId) || 0) + creditsChange
+                );
+            }
+        });
+
+        // Applica gli aggiornamenti dei crediti
+        for (const [userId, creditsChange] of userUpdates) {
+            const userRef = doc(getUsersCollectionRef(), userId);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+                const currentCredits = userSnap.data().credits || 0;
+                batch.update(userRef, {
+                    credits: currentCredits + creditsChange
+                });
+            }
+        }
+
+        // Esegui il batch
+        await batch.commit();
+
+        messageBox(`Scommesse liquidate per la giornata ${giornata}. ${userUpdates.size} utenti aggiornati.`);
+        return true;
+    } catch (error) {
+        console.error("Errore liquidazione scommesse:", error);
+        messageBox(`Errore durante la liquidazione delle scommesse: ${error.message}`);
+        return false;
+    }
+};
+
+/**
+ * Aggiorna le partite aperte con la giornata attiva
+ */
+export const updateOpenMatchesWithActiveGiornata = async () => {
+    if (loadActiveGiornata) {
+        const activeGiornata = await loadActiveGiornata();
+        if (activeGiornata) {
+            console.log('Aggiornamento partite con giornata attiva:', activeGiornata);
+            // Questa funzione deve essere chiamata dal modulo rendering.js
+            return activeGiornata;
+        }
+    }
+    return null;
+};
+
+// ==================== FUNZIONI CANCELLAZIONE ROSE E STATISTICHE ====================
+
+/**
+ * Cancella tutte le rose squadre
+ */
+export const clearSquadsData = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTE le rose squadre (calciatori e aggregati)? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar('Cancellazione Rose');
+    
+    try {
+        updateProgress(0, 'Cancellazione calciatori...');
+        
+        // Cancella tutti i calciatori
+        const playersSnapshot = await getDocs(getPlayersCollectionRef());
+        const playerDocs = playersSnapshot.docs.length;
+        let deletedPlayers = 0;
+        
+        for (const docSnapshot of playersSnapshot.docs) {
+            await deleteDoc(doc(getPlayersCollectionRef(), docSnapshot.id));
+            deletedPlayers++;
+            
+            const progress = (deletedPlayers / playerDocs) * 50;
+            updateProgress(progress, `Cancellazione calciatori...`, deletedPlayers, playerDocs);
+        }
+        
+        updateProgress(50, 'Cancellazione info squadre...');
+        
+        // Cancella le informazioni aggregate squadre
+        const squadsSnapshot = await getDocs(getSquadsCollectionRef());
+        const squadDocs = squadsSnapshot.docs.length;
+        let deletedSquads = 0;
+        
+        for (const docSnapshot of squadsSnapshot.docs) {
+            await deleteDoc(doc(getSquadsCollectionRef(), docSnapshot.id));
+            deletedSquads++;
+            
+            const progress = 50 + (deletedSquads / squadDocs) * 50;
+            updateProgress(progress, `Cancellazione info squadre...`, deletedSquads, squadDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellate ${deletedPlayers} calciatori e ${deletedSquads} squadre.`);
+        console.log(`Rose cancellate: ${deletedPlayers} calciatori, ${deletedSquads} squadre`);
+        
+        // Pulisci il container visualizzazione
+        const container = document.getElementById('squads-data-container');
+        if (container) {
+            container.innerHTML = '<p class="text-gray-500 text-sm">Nessun dato rose caricato.</p>';
+        }
+    } catch (error) {
+        console.error("Errore cancellazione rose:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+/**
+ * Cancella tutte le statistiche calciatori
+ */
+export const clearPlayerStats = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTE le statistiche dei calciatori? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar('Cancellazione Statistiche');
+    
+    try {
+        const statsSnapshot = await getDocs(getPlayerStatsCollectionRef());
+        const totalDocs = statsSnapshot.docs.length;
+        let deletedCount = 0;
+        
+        updateProgress(0, 'Cancellazione statistiche in corso...');
+        
+        for (const docSnapshot of statsSnapshot.docs) {
+            await deleteDoc(doc(getPlayerStatsCollectionRef(), docSnapshot.id));
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgress(progress, `Cancellazione statistiche...`, deletedCount, totalDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellate ${deletedCount} statistiche calciatori.`);
+        console.log(`Cancellate ${deletedCount} statistiche`);
+        
+        // Pulisci il container visualizzazione
+        const summaryContainer = document.getElementById('stats-summary-container');
+        if (summaryContainer) {
+            summaryContainer.innerHTML = '';
+        }
+        const dataContainer = document.getElementById('stats-data-container');
+        if (dataContainer) {
+            dataContainer.innerHTML = '<p class="text-gray-500 text-sm">Nessuna statistica caricata.</p>';
+        }
+    } catch (error) {
+        console.error("Errore cancellazione statistiche:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
 /**
  * Espone le funzioni admin a window per l'uso nell'HTML
  */
@@ -573,4 +1215,21 @@ export const setupGlobalAdminFunctions = () => {
     window.saveAllSchedules = saveAllSchedules;
     window.renderAdminBetsFilter = renderAdminBetsFilter;
     window.updateUserBet = updateUserBet;
+    
+    // Funzioni di pulizia
+    window.clearHistoricResultsAndTeams = clearHistoricResultsAndTeams;
+    window.clearHistoricResults = clearHistoricResults;
+    window.clearOpenMatches = clearOpenMatches;
+    window.clearAllBets = clearAllBets;
+    window.resetUserCredits = resetUserCredits;
+    window.clearAllTeams = clearAllTeams;
+    window.clearSquadsData = clearSquadsData;
+    window.clearPlayerStats = clearPlayerStats;
+    
+    // Funzioni gestione partite e risultati
+    window.addHistoricResult = addHistoricResult;
+    window.addTeam = addTeam;
+    window.closeMatchAndSaveScore = closeMatchAndSaveScore;
+    window.calculateAndSaveMatch = calculateAndSaveMatch;
+    window.updateOpenMatchesWithActiveGiornata = updateOpenMatchesWithActiveGiornata;
 };

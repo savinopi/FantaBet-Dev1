@@ -311,6 +311,45 @@ export const getUserCredits = () => userCredits;
 export const getIsUserAdmin = () => isUserAdmin;
 
 // ===================================
+// SALVATAGGIO PROFILO
+// ===================================
+
+/**
+ * Salva le modifiche al profilo utente
+ */
+export const saveUserProfile = async () => {
+    const newDisplayName = document.getElementById('profile-display-name').value.trim();
+    if (!newDisplayName) {
+        messageBox("Il nome visualizzato non può essere vuoto.");
+        return;
+    }
+    
+    if (!userId) {
+        messageBox("Devi essere autenticato per modificare il profilo.");
+        return;
+    }
+    
+    try {
+        await updateDoc(doc(getUsersCollectionRef(), userId), { displayName: newDisplayName });
+        messageBox("Profilo aggiornato con successo!");
+    } catch (error) {
+        console.error("Errore salvataggio profilo:", error);
+        messageBox("Errore durante il salvataggio del profilo: " + error.message);
+    }
+};
+
+/**
+ * Mostra il modal delle statistiche di una partita
+ */
+export const showMatchStatsModal = async (homeTeam, awayTeam) => {
+    // Semplicemente apri le stats della squadra casa
+    // L'utente può poi chiudere e aprire l'altra se vuole
+    if (window.showTeamStats) {
+        await window.showTeamStats(homeTeam);
+    }
+};
+
+// ===================================
 // SETUP AUTH STATE LISTENER
 // ===================================
 
@@ -375,3 +414,5 @@ export const setupAuthStateListener = (callbacks) => {
 // Esponi funzioni globalmente per onclick inline nell'HTML
 window.handleLoginRegister = handleLoginRegister;
 window.handleLogout = handleLogout;
+window.saveUserProfile = saveUserProfile;
+window.showMatchStatsModal = showMatchStatsModal;
