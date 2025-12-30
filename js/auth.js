@@ -303,6 +303,14 @@ export const setIsUserAdmin = (admin) => {
 };
 
 // ===================================
+// GETTER FUNCTIONS
+// ===================================
+
+export const getUserId = () => userId;
+export const getUserCredits = () => userCredits;
+export const getIsUserAdmin = () => isUserAdmin;
+
+// ===================================
 // SETUP AUTH STATE LISTENER
 // ===================================
 

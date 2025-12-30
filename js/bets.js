@@ -24,9 +24,6 @@ import {
     setOpenMatches,
     getNextGiornataNumber, 
     setNextGiornataNumber,
-    getUserId, 
-    getUserCredits,
-    getIsUserAdmin,
     getDeadlineHasPassed,
     setDeadlineHasPassed,
     getCountdownInterval,
@@ -36,7 +33,7 @@ import {
     getAdminBetsUnsubscribe,
     setAdminBetsUnsubscribe
 } from './state.js';
-import { adjustCredits, addUnsubscribe } from './auth.js';
+import { adjustCredits, addUnsubscribe, getUserId, getUserCredits, getIsUserAdmin } from './auth.js';
 
 // Import di funzioni che saranno definite altrove
 let getGiornataDeadline;

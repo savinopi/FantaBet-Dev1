@@ -15,12 +15,10 @@ import {
     getUsersCollectionRef,
     getSquadsCollectionRef,
     getScheduleCollectionRef,
-    getGiornataBetsCollectionRef,
-    addUnsubscribe
+    getGiornataBetsCollectionRef
 } from './firebase-config.js';
 import { messageBox } from './utils.js';
 import { 
-    getIsUserAdmin,
     getAllUsersForAdmin,
     setAllUsersForAdmin,
     getNextGiornataNumber,
@@ -29,6 +27,7 @@ import {
     getAdminBetsUnsubscribe,
     setAdminBetsUnsubscribe
 } from './state.js';
+import { addUnsubscribe, getIsUserAdmin } from './auth.js';
 
 // Variabili per la cache degli orari (saranno settate dall'esterno)
 let scheduleCache = null;
