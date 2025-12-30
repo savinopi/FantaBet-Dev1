@@ -12,7 +12,7 @@
 import { 
     db, 
     auth,
-    initializeApp,
+    initializeApp as firebaseInitializeApp,
     getFirestore,
     getAuth,
     onSnapshot,
