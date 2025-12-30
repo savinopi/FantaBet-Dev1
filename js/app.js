@@ -226,9 +226,16 @@ const setupListeners = () => {
     addUnsubscribe(
         onSnapshot(getResultsCollectionRef(), (snapshot) => {
             const results = snapshot.docs.map(doc => doc.data());
+            console.log('[DEBUG] Risultati ricevuti da Firestore:', results.length);
             state.setAllResults(results);
             renderHistoricResults(results);
-            renderStandings();
+            try {
+                console.log('[DEBUG] Chiamando renderStandings...');
+                renderStandings();
+                console.log('[DEBUG] renderStandings completato');
+            } catch (e) {
+                console.error('[DEBUG] Errore in renderStandings:', e);
+            }
             renderStatistics();
             renderStandingsTrend();
             
