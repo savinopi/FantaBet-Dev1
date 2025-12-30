@@ -108,6 +108,12 @@ import {
     renderStandingsTrend
 } from './rendering.js';
 
+import {
+    setupGlobalAdminFunctions,
+    setAdminDependencies,
+    renderAdminBetsList
+} from './admin.js';
+
 // Import nuovi moduli
 import {
     loadBonusData,
@@ -178,12 +184,15 @@ const setupFirebase = async () => {
         // Setup funzioni globali per bets (onclick nell'HTML)
         setupGlobalBetsFunctions();
         
+        // Setup funzioni globali per admin (onclick nell'HTML)
+        setupGlobalAdminFunctions();
+        
         // Setup dipendenze per bets.js
         setBetsDependencies({
             getGiornataDeadline: getGiornataDeadline,
             isDeadlinePassed: isDeadlinePassed,
             checkPendingBonusRequests: () => {}, // placeholder
-            renderAdminBetsList: () => {} // placeholder
+            renderAdminBetsList: renderAdminBetsList
         });
         
         // Setup dipendenze per odds calculation

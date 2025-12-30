@@ -1311,4 +1311,5 @@ export const setupGlobalBetsFunctions = () => {
     window.calculateOdds = calculateOdds;
     window.calculateStandings = calculateStandings;
     window.calculateTeamStats = calculateTeamStats;
+    window.setupAdminBetsListener = setupAdminBetsListener;
 };

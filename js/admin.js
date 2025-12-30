@@ -1232,4 +1232,19 @@ export const setupGlobalAdminFunctions = () => {
     window.closeMatchAndSaveScore = closeMatchAndSaveScore;
     window.calculateAndSaveMatch = calculateAndSaveMatch;
     window.updateOpenMatchesWithActiveGiornata = updateOpenMatchesWithActiveGiornata;
+    
+    // Configura i callback per le tab admin
+    window.adminTabCallbacks = {
+        onUsersTab: loadUsersForAdmin,
+        onSchedulesTab: loadSchedulesForAdmin,
+        onBetsTab: async () => {
+            // Carica prima gli utenti poi setup listener
+            await loadUsersForAdmin();
+            const allUsers = getAllUsersForAdmin();
+            const giornataNum = getNextGiornataNumber();
+            if (window.setupAdminBetsListener) {
+                window.setupAdminBetsListener(giornataNum, allUsers);
+            }
+        }
+    };
 };
