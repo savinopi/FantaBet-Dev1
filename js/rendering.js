@@ -183,9 +183,14 @@ export const calculateStandings = (results) => {
  */
 export const renderStandings = (sortColumn = null) => {
     const container = document.getElementById('standings-container');
-    if (!container) return;
+    if (!container) {
+        console.error('renderStandings: container standings-container non trovato');
+        return;
+    }
     
     const results = state.allResults;
+    console.log('renderStandings: risultati caricati:', results?.length || 0);
+    
     if (!results || results.length === 0) {
         container.innerHTML = '<p class="text-sm sm:text-base text-gray-500 text-center py-4 px-4">Carica i risultati per visualizzare la classifica</p>';
         return;
