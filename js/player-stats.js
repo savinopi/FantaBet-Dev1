@@ -15,6 +15,10 @@ import { messageBox, showProgressBar, hideProgressBar, updateProgressBar, update
 import { getTeamLogo } from './config.js';
 import { getIsUserAdmin } from './auth.js';
 import { getAllResults } from './state.js';
+import { renderStandingsTrend } from './rendering.js';
+
+// Cache per le immagini dei giocatori
+const playerImageCache = new Map();
 
 // Variabili per l'ordinamento
 let currentSortColumn = 'fm';
@@ -27,14 +31,12 @@ let currentSquadsData = new Map();
 
 // Dipendenze esterne
 let renderStatistics = null;
-let renderStandingsTrend = null;
 
 /**
  * Imposta le dipendenze esterne
  */
 export const setPlayerStatsDependencies = (deps) => {
     if (deps.renderStatistics) renderStatistics = deps.renderStatistics;
-    if (deps.renderStandingsTrend) renderStandingsTrend = deps.renderStandingsTrend;
 };
 
 // ==================== CANCELLAZIONE DATI ====================
@@ -157,11 +159,16 @@ export const clearSquadsData = async () => {
  */
 export const loadPlayerStats = async () => {
     try {
+        console.log('[LoadPlayerStats] Avvio caricamento statistiche...');
+        
         const statsCollection = getPlayerStatsCollectionRef();
         const snapshot = await getDocs(statsCollection);
         
+        console.log('[LoadPlayerStats] Snapshot ricevuto, documenti:', snapshot.size);
+        
         if (snapshot.empty) {
-            document.getElementById('player-stats-view-container').innerHTML = '<p class="text-center text-gray-500 py-8">Nessuna statistica caricata. Contatta l\'admin per il caricamento.</p>';
+            console.warn('[LoadPlayerStats] Nessuna statistica trovata');
+            document.getElementById('player-stats-table').innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-8">Nessuna statistica caricata. Contatta l\'admin per il caricamento.</td></tr>';
             return;
         }
         
@@ -172,9 +179,19 @@ export const loadPlayerStats = async () => {
             allStats.push(data);
         });
         
+        console.log('[LoadPlayerStats] Statistiche caricate:', allStats.length);
+        console.log('[LoadPlayerStats] Primo elemento:', allStats[0]);
+        
         // Popola i filtri
         const squadFilter = document.getElementById('stats-squad-filter');
+        if (!squadFilter) {
+            console.error('[LoadPlayerStats] stats-squad-filter non trovato');
+            return;
+        }
+        
         const uniqueSquads = [...new Set(allStats.map(s => s.fantaSquad))].sort();
+        console.log('[LoadPlayerStats] Squadre trovate:', uniqueSquads);
+        
         squadFilter.innerHTML = '<option value="all">Tutte le rose</option>';
         uniqueSquads.forEach(squad => {
             squadFilter.innerHTML += `<option value="${squad}">${squad}</option>`;
@@ -186,12 +203,14 @@ export const loadPlayerStats = async () => {
         window.currentPlayerStats = allStats;
         window.currentFilteredStats = allStats;
         
+        console.log('[LoadPlayerStats] Chiamata sortPlayerStats con colonna:', currentSortColumn);
+        
         // Mostra tutte le statistiche con ordinamento default
         sortPlayerStats(currentSortColumn);
         
     } catch (error) {
-        console.error('Errore nel caricamento delle statistiche:', error);
-        messageBox('Errore nel caricamento delle statistiche.');
+        console.error('[LoadPlayerStats] Errore:', error);
+        messageBox('Errore nel caricamento delle statistiche: ' + error.message);
     }
 };
 
@@ -199,11 +218,19 @@ export const loadPlayerStats = async () => {
  * Renderizza la vista delle statistiche calciatori
  */
 const renderPlayerStatsView = (stats) => {
-    const container = document.getElementById('player-stats-view-container');
-    if (!container) return;
+    console.log('[RenderPlayerStatsView] Inizio rendering, stats:', stats.length);
+    
+    const tableBody = document.getElementById('player-stats-table');
+    if (!tableBody) {
+        console.error('[ERROR] player-stats-table non trovato');
+        return;
+    }
+    
+    console.log('[RenderPlayerStatsView] Elemento trovato, contenuto vuoto');
     
     if (stats.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500 py-8">Nessun giocatore trovato con i filtri selezionati.</p>';
+        console.warn('[RenderPlayerStatsView] Nessun giocatore da mostrare');
+        tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-4">Nessun giocatore trovato con i filtri selezionati.</td></tr>';
         return;
     }
     
@@ -225,104 +252,51 @@ const renderPlayerStatsView = (stats) => {
         'A': 'text-red-400'
     };
     
-    // Visualizzazione in tabella
-    let html = '<div class="overflow-x-auto">';
-    html += '<table class="min-w-full bg-gray-800 rounded-lg overflow-hidden text-sm">';
-    html += `
-        <thead>
-            <tr class="bg-gray-700 text-gray-300 text-xs uppercase">
-                <th onclick="sortPlayerStats('playerName')" class="px-3 py-2 text-left sticky left-0 bg-gray-700 z-10 cursor-pointer hover:bg-gray-600 transition-colors">
-                    Calciatore ${getSortIcon('playerName')}
-                </th>
-                <th onclick="sortPlayerStats('fantaSquad')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    Rosa ${getSortIcon('fantaSquad')}
-                </th>
-                <th onclick="sortPlayerStats('role')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    Ruolo ${getSortIcon('role')}
-                </th>
-                <th onclick="sortPlayerStats('serieATeam')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    Squadra ${getSortIcon('serieATeam')}
-                </th>
-                <th onclick="sortPlayerStats('pv')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    PV ${getSortIcon('pv')}
-                </th>
-                <th onclick="sortPlayerStats('mv')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    MV ${getSortIcon('mv')}
-                </th>
-                <th onclick="sortPlayerStats('fm')" class="px-3 py-2 text-center bg-blue-900/30 cursor-pointer hover:bg-blue-800/40 transition-colors">
-                    FM ${getSortIcon('fm')}
-                </th>
-                <th onclick="sortPlayerStats('gf')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    GF ${getSortIcon('gf')}
-                </th>
-                <th onclick="sortPlayerStats('gs')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    GS ${getSortIcon('gs')}
-                </th>
-                <th onclick="sortPlayerStats('rp')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    RP ${getSortIcon('rp')}
-                </th>
-                <th onclick="sortPlayerStats('rc')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    RC ${getSortIcon('rc')}
-                </th>
-                <th onclick="sortPlayerStats('rPlus')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    R+ ${getSortIcon('rPlus')}
-                </th>
-                <th onclick="sortPlayerStats('rMinus')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    R- ${getSortIcon('rMinus')}
-                </th>
-                <th onclick="sortPlayerStats('ass')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    ASS ${getSortIcon('ass')}
-                </th>
-                <th onclick="sortPlayerStats('amm')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    AMM ${getSortIcon('amm')}
-                </th>
-                <th onclick="sortPlayerStats('esp')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    ESP ${getSortIcon('esp')}
-                </th>
-                <th onclick="sortPlayerStats('au')" class="px-3 py-2 text-center cursor-pointer hover:bg-gray-600 transition-colors">
-                    AU ${getSortIcon('au')}
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-    `;
-    
-    stats.forEach((stat, index) => {
-        const bgClass = index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750';
-        const roleColor = roleColors[stat.role] || 'text-white';
-        
+    // Compila solo il tbody (la tabella è già nel HTML)
+    let html = '';
+    stats.forEach(stat => {
         html += `
-            <tr class="${bgClass} hover:bg-gray-700 transition-colors">
-                <td class="px-3 py-2 font-medium sticky left-0 ${bgClass} z-10">${stat.playerName}</td>
-                <td class="px-3 py-2 text-center text-xs text-purple-400">${stat.fantaSquad}</td>
-                <td class="px-3 py-2 text-center font-bold ${roleColor}">${stat.role}</td>
-                <td class="px-3 py-2 text-center text-xs text-gray-400">${stat.serieATeam}</td>
-                <td class="px-3 py-2 text-center">${stat.pv}</td>
-                <td class="px-3 py-2 text-center">${stat.mv.toFixed(2)}</td>
-                <td class="px-3 py-2 text-center font-bold text-blue-300 bg-blue-900/20">${stat.fm.toFixed(2)}</td>
-                <td class="px-3 py-2 text-center ${stat.gf > 0 ? 'text-green-400 font-bold' : ''}">${stat.gf || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.gs > 0 ? 'text-red-400' : ''}">${stat.gs || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.rp > 0 ? 'text-green-400' : ''}">${stat.rp || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.rc > 0 ? 'text-red-400' : ''}">${stat.rc || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.rPlus > 0 ? 'text-green-400' : ''}">${stat.rPlus || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.rMinus > 0 ? 'text-red-400' : ''}">${stat.rMinus || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.ass > 0 ? 'text-blue-400 font-bold' : ''}">${stat.ass || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.amm > 0 ? 'text-yellow-400' : ''}">${stat.amm || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.esp > 0 ? 'text-red-500 font-bold' : ''}">${stat.esp || '-'}</td>
-                <td class="px-3 py-2 text-center ${stat.au > 0 ? 'text-red-400' : ''}">${stat.au || '-'}</td>
+            <tr class="border-t border-gray-700 hover:bg-gray-700/50 transition-colors text-xs sm:text-sm">
+                <td class="px-3 py-2 text-left sticky left-0 bg-gray-800 hover:bg-gray-700/50">
+                    <span class="font-semibold">${stat.playerName || '-'}</span>
+                </td>
+                <td class="px-2 py-2 text-center text-xs">
+                    <span class="text-purple-400">${stat.fantaSquad || '-'}</span>
+                </td>
+                <td class="px-2 py-2 text-center">
+                    <span class="text-xs ${roleColors[stat.role] || 'text-gray-400'} font-bold">${stat.role || '-'}</span>
+                </td>
+                <td class="px-2 py-2 text-left text-xs">${stat.serieATeam || '-'}</td>
+                <td class="px-2 py-2 text-center font-semibold">${stat.pv || '-'}</td>
+                <td class="px-2 py-2 text-center text-green-400 font-bold">${stat.mv !== undefined ? stat.mv.toFixed(2) : '-'}</td>
+                <td class="px-2 py-2 text-center ${stat.fm > 6 ? 'text-blue-400 font-bold' : stat.fm < 6 ? 'text-red-400' : ''}">${stat.fm !== undefined ? stat.fm.toFixed(1) : '-'}</td>
+                <td class="px-2 py-2 text-center ${stat.gf > 0 ? 'text-green-400 font-bold' : ''}">${stat.gf || '-'}</td>
+                <td class="px-2 py-2 text-center">${stat.gs || '-'}</td>
+                <td class="px-2 py-2 text-center">${stat.rp || '-'}</td>
+                <td class="px-2 py-2 text-center">${stat.rc || '-'}</td>
+                <td class="px-2 py-2 text-center ${stat.rPlus > 0 ? 'text-green-400 font-bold' : ''}">${stat.rPlus || '-'}</td>
+                <td class="px-2 py-2 text-center ${stat.rMinus > 0 ? 'text-red-400 font-bold' : ''}">${stat.rMinus || '-'}</td>
+                <td class="px-2 py-2 text-center ${stat.ass > 0 ? 'text-blue-400 font-bold' : ''}">${stat.ass || '-'}</td>
+                <td class="px-2 py-2 text-center ${stat.amm > 0 ? 'text-yellow-400' : ''}">${stat.amm || '-'}</td>
+                <td class="px-2 py-2 text-center ${stat.esp > 0 ? 'text-red-500 font-bold' : ''}">${stat.esp || '-'}</td>
             </tr>
         `;
     });
     
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
+    tableBody.innerHTML = html;
+    console.log('[RenderPlayerStatsView] Rendering completato, righe inserite:', stats.length);
 };
 
 /**
  * Ordina le statistiche dei calciatori
  */
 export const sortPlayerStats = (column) => {
-    if (!currentFilteredStats || currentFilteredStats.length === 0) return;
+    console.log('[SortPlayerStats] Ordinamento richiesto per colonna:', column);
+    
+    if (!currentFilteredStats || currentFilteredStats.length === 0) {
+        console.warn('[SortPlayerStats] Nessun dato da ordinare');
+        return;
+    }
     
     // Se clicco sulla stessa colonna, inverto la direzione
     if (currentSortColumn === column) {
@@ -333,6 +307,8 @@ export const sortPlayerStats = (column) => {
         const textColumns = ['playerName', 'fantaSquad', 'role', 'serieATeam'];
         currentSortDirection = textColumns.includes(column) ? 'asc' : 'desc';
     }
+    
+    console.log('[SortPlayerStats] Ordinamento: colonna=' + column + ' direzione=' + currentSortDirection);
     
     // Ordina i dati
     const sorted = [...currentFilteredStats].sort((a, b) => {
@@ -357,17 +333,68 @@ export const sortPlayerStats = (column) => {
     
     currentFilteredStats = sorted;
     window.currentFilteredStats = sorted;
+    
+    // Aggiorna visual indicators nei header
+    updateSortIndicators(column);
+    
     renderPlayerStatsView(sorted);
+};
+
+/**
+ * Aggiorna i visual indicators di ordinamento nei header
+ */
+const updateSortIndicators = (column) => {
+    console.log('[UpdateSortIndicators] Aggiornamento indicatori per colonna:', column);
+    
+    const headers = document.querySelectorAll('thead th');
+    if (!headers || headers.length === 0) {
+        console.warn('[UpdateSortIndicators] Nessun header trovato');
+        return;
+    }
+    
+    headers.forEach(header => {
+        const onclick = header.getAttribute('onclick');
+        if (!onclick) return;
+        
+        const match = onclick.match(/'([^']+)'/);
+        if (!match) return;
+        
+        const colName = match[1];
+        
+        if (colName === column) {
+            // Rimuovi frecce precedenti
+            header.textContent = header.textContent.replace(/↑|↓/g, '').trim();
+            
+            if (currentSortDirection === 'asc') {
+                header.textContent += ' ↑';
+            } else {
+                header.textContent += ' ↓';
+            }
+            header.classList.add('text-blue-400');
+            console.log('[UpdateSortIndicators] Header "' + colName + '" marcato come ordinato');
+        } else {
+            // Rimuovi frecce dalle altre colonne
+            header.textContent = header.textContent.replace(/↑|↓/g, '').trim();
+            header.classList.remove('text-blue-400');
+        }
+    });
 };
 
 /**
  * Filtra le statistiche dei calciatori
  */
 export const filterPlayerStats = () => {
-    if (!currentPlayerStats || currentPlayerStats.length === 0) return;
+    console.log('[FilterPlayerStats] Inizio applicazione filtri...');
+    
+    if (!currentPlayerStats || currentPlayerStats.length === 0) {
+        console.warn('[FilterPlayerStats] Nessun dato per filtrare');
+        return;
+    }
     
     const squadFilter = document.getElementById('stats-squad-filter').value;
     const roleFilter = document.getElementById('stats-role-filter').value;
+    
+    console.log('[FilterPlayerStats] Filtri applicati: squadra=' + squadFilter + ' ruolo=' + roleFilter);
     
     let filtered = [...currentPlayerStats];
     
@@ -379,6 +406,8 @@ export const filterPlayerStats = () => {
     if (roleFilter !== 'all') {
         filtered = filtered.filter(s => s.role === roleFilter);
     }
+    
+    console.log('[FilterPlayerStats] Risultati dopo filtri:', filtered.length);
     
     // Salva i dati filtrati e applica l'ordinamento corrente
     currentFilteredStats = filtered;
@@ -561,6 +590,21 @@ const renderPlayerLeaderboards = (data, totalGiornate = 0) => {
 export const loadSquadsData = async () => {
     try {
         const playersCollection = getPlayersCollectionRef();
+        const statsCollection = getPlayerStatsCollectionRef();
+        
+        // Carica le statistiche per ottenere gli IDs
+        const statsSnapshot = await getDocs(statsCollection);
+        const playerIdMap = new Map(); // Nome normalizzato -> playerId
+        
+        statsSnapshot.forEach(doc => {
+            const stat = doc.data();
+            const normalizedName = (stat.playerName || '').trim().toLowerCase();
+            playerIdMap.set(normalizedName, stat.playerId);
+        });
+        
+        console.log(`[Rose] IDs caricati dalle statistiche: ${playerIdMap.size} giocatori`);
+        
+        // Carica i giocatori dalle Rose
         const snapshot = await getDocs(playersCollection);
         
         if (snapshot.empty) {
@@ -568,18 +612,38 @@ export const loadSquadsData = async () => {
             return;
         }
         
-        // Raggruppa i giocatori per squadra
+        // Raggruppa i giocatori per squadra e arricchisci con playerId
         const squadsMap = new Map();
+        let enrichedCount = 0;
+        
         snapshot.forEach(doc => {
             const player = doc.data();
+            
+            // Prova a trovare il playerId dalle statistiche
+            const normalizedName = (player.playerName || '').trim().toLowerCase();
+            if (!player.playerId && playerIdMap.has(normalizedName)) {
+                player.playerId = playerIdMap.get(normalizedName);
+                enrichedCount++;
+            }
+            
             if (!squadsMap.has(player.squadName)) {
                 squadsMap.set(player.squadName, []);
             }
             squadsMap.get(player.squadName).push(player);
         });
         
+        console.log(`[Rose] Giocatori arricchiti con playerId: ${enrichedCount}/${snapshot.size}`);
+        
+        // Debug: Mostra il primo giocatore per controllare se ha playerId
+        if (squadsMap.size > 0) {
+            const firstPlayers = squadsMap.values().next().value;
+            if (firstPlayers && firstPlayers.length > 0) {
+                console.log('[DEBUG Rose] Primo giocatore caricato:', firstPlayers[0]);
+            }
+        }
+        
         // Popola il filtro squadre
-        const filterSelect = document.getElementById('squad-filter');
+        const filterSelect = document.getElementById('squads-filter');
         filterSelect.innerHTML = '<option value="all">Tutte le squadre</option>';
         Array.from(squadsMap.keys()).sort().forEach(squadName => {
             filterSelect.innerHTML += `<option value="${squadName}">${squadName}</option>`;
@@ -602,77 +666,201 @@ export const loadSquadsData = async () => {
  * Renderizza la vista delle rose
  */
 const renderSquadsView = (squadsMap) => {
-    const container = document.getElementById('squads-view-container');
+    const container = document.getElementById('squads-grid');
     if (!container) return;
     
-    let html = '<div class="space-y-6">';
+    console.log('[DEBUG renderSquadsView] Numero squadre:', squadsMap.size);
+    if (squadsMap.size > 0) {
+        const firstPlayers = squadsMap.values().next().value;
+        console.log('[DEBUG renderSquadsView] Primo giocatore della prima squadra:', firstPlayers[0]);
+    }
+    
+    let html = '';
     
     // Ordina le squadre alfabeticamente
     const sortedSquads = Array.from(squadsMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     
+    // Icone per i ruoli
+    const roleIcons = {
+        P: '🧤',
+        D: '🛡️',
+        C: '⚙️',
+        A: '⚽'
+    };
+    
+    const roleLabels = { 
+        P: 'Portieri', 
+        D: 'Difensori', 
+        C: 'Centrocampisti', 
+        A: 'Attaccanti' 
+    };
+    
+    const roleSectionColors = {
+        P: 'from-yellow-600/20 to-yellow-600/10 border-yellow-500/30',
+        D: 'from-blue-600/20 to-blue-600/10 border-blue-500/30',
+        C: 'from-green-600/20 to-green-600/10 border-green-500/30',
+        A: 'from-red-600/20 to-red-600/10 border-red-500/30'
+    };
+    
+    const roleBgColors = { 
+        P: 'from-yellow-900 to-yellow-800', 
+        D: 'from-blue-900 to-blue-800', 
+        C: 'from-green-900 to-green-800', 
+        A: 'from-red-900 to-red-800' 
+    };
+    
+    const roleBorderColors = { 
+        P: 'border-yellow-600', 
+        D: 'border-blue-600', 
+        C: 'border-green-600', 
+        A: 'border-red-600' 
+    };
+
+    // Funzione per ottenere le iniziali del giocatore
+    const getPlayerInitials = (playerName) => {
+        if (!playerName) return '?';
+        const names = playerName.split(' ');
+        if (names.length >= 2) {
+            return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+        }
+        return playerName.substring(0, 2).toUpperCase();
+    };
+
+    // Funzione per ottenere colore per le iniziali basato sul ruolo
+    const getInitialsBgColor = (role) => {
+        const colors = {
+            P: 'bg-yellow-600',
+            D: 'bg-blue-600',
+            C: 'bg-green-600',
+            A: 'bg-red-600'
+        };
+        return colors[role] || 'bg-gray-600';
+    };
+    
     for (const [squadName, players] of sortedSquads) {
         const totalCost = players.reduce((sum, p) => sum + p.cost, 0);
-        const roles = {
-            P: players.filter(p => p.role === 'P'),
-            D: players.filter(p => p.role === 'D'),
-            C: players.filter(p => p.role === 'C'),
-            A: players.filter(p => p.role === 'A')
-        };
+        const squadLogoUrl = getTeamLogo(squadName);
         
+        // Header della squadra
         html += `
-            <div class="bg-gray-800 border border-purple-700/50 rounded-lg overflow-hidden">
-                <!-- Header squadra -->
-                <div class="bg-gradient-to-r from-purple-900 to-purple-800 p-4 border-b border-purple-700">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-xl font-bold text-white">${squadName}</h3>
-                        <div class="text-right">
-                            <p class="text-sm text-purple-200">Giocatori: <span class="font-bold">${players.length}</span></p>
-                            <p class="text-sm text-yellow-300">Crediti: <span class="font-bold">${totalCost}</span></p>
+            <div class="bg-gray-900 border-2 border-purple-600 rounded-xl overflow-hidden shadow-2xl">
+                <!-- Header squadra con logo e info -->
+                <div class="bg-gradient-to-r from-purple-900 via-purple-800 to-purple-900 p-4 border-b-2 border-purple-600">
+                    <div class="flex items-center gap-4 mb-3">
+                        <img src="${squadLogoUrl}" alt="${squadName}" class="w-14 h-14 object-contain rounded-lg bg-white/5 p-1 border border-purple-500" onerror="this.style.display='none'">
+                        <div class="flex-1">
+                            <h3 class="text-2xl font-bold text-white tracking-wide">${squadName}</h3>
+                            <div class="flex gap-3 mt-2 text-sm">
+                                <div class="bg-purple-700/50 px-3 py-1 rounded-full border border-purple-500">
+                                    <span class="text-gray-300">👥</span>
+                                    <span class="text-white font-bold ml-1">${players.length}</span>
+                                </div>
+                                <div class="bg-yellow-700/50 px-3 py-1 rounded-full border border-yellow-500">
+                                    <span class="text-gray-300">💰</span>
+                                    <span class="text-yellow-300 font-bold ml-1">${totalCost}</span>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                    <!-- Barra statistiche ruoli -->
+                    <div class="flex gap-2 text-xs">
+                        ${['P', 'D', 'C', 'A'].map(role => {
+                            const count = players.filter(p => p.role === role).length;
+                            return `<span class="bg-gray-800/50 px-2 py-1 rounded">${roleIcons[role]} ${roleLabels[role]}: <span class="font-bold">${count}</span></span>`;
+                        }).join('')}
                     </div>
                 </div>
                 
-                <!-- Giocatori per ruolo -->
-                <div class="p-4 space-y-4">
+                <!-- Contenuto rose raggruppate per ruolo -->
+                <div class="p-4 space-y-6">
         `;
         
-        // Mostra i giocatori per ogni ruolo
-        const roleLabels = { P: 'Portieri', D: 'Difensori', C: 'Centrocampisti', A: 'Attaccanti' };
-        const roleColors = { P: 'yellow', D: 'blue', C: 'green', A: 'red' };
+        // Raggruppa i giocatori per ruolo
+        const roleOrder = { P: 0, D: 1, C: 2, A: 3 };
+        const groupedByRole = {};
         
-        for (const [roleKey, roleLabel] of Object.entries(roleLabels)) {
-            const rolePlayers = roles[roleKey];
-            if (rolePlayers.length > 0) {
-                const color = roleColors[roleKey];
+        for (const player of players) {
+            const role = player.role || 'N/A';
+            if (!groupedByRole[role]) {
+                groupedByRole[role] = [];
+            }
+            groupedByRole[role].push(player);
+        }
+        
+        // Renderizza ogni ruolo in ordine
+        for (const role of ['P', 'D', 'C', 'A']) {
+            const rolePlayers = groupedByRole[role] || [];
+            if (rolePlayers.length === 0) continue;
+            
+            // Ordina per costo decrescente
+            rolePlayers.sort((a, b) => b.cost - a.cost);
+            
+            const bgColor = roleSectionColors[role];
+            
+            html += `
+                <div class="bg-gradient-to-r ${bgColor} border rounded-lg p-4">
+                    <h4 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <span class="text-2xl">${roleIcons[role]}</span>
+                        ${roleLabels[role]} (${rolePlayers.length})
+                    </h4>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            `;
+            
+            for (const player of rolePlayers) {
+                const initials = getPlayerInitials(player.playerName);
+                const bgGradient = roleBgColors[role];
+                const borderColor = roleBorderColors[role];
+                const initialsColor = getInitialsBgColor(role);
+                
+                // Costruisci URL immagine se esiste l'ID
+                const playerImageUrl = player.playerId 
+                    ? `https://content.fantacalcio.it/web/campioncini/20/card/${player.playerId}.png?v=466`
+                    : null;
+                
                 html += `
-                    <div>
-                        <h4 class="text-sm font-bold text-${color}-400 mb-2 flex items-center">
-                            <span class="inline-block w-6 h-6 rounded-full bg-${color}-900 text-${color}-300 text-center text-xs leading-6 mr-2">${roleKey}</span>
-                            ${roleLabel} (${rolePlayers.length})
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                `;
-                
-                // Ordina i giocatori per costo decrescente
-                rolePlayers.sort((a, b) => b.cost - a.cost);
-                
-                for (const player of rolePlayers) {
-                    html += `
-                        <div class="bg-gray-700 rounded px-3 py-2 flex justify-between items-center">
-                            <div>
-                                <p class="text-sm font-medium text-white">${player.playerName}</p>
-                                <p class="text-xs text-gray-400">${player.serieATeam}</p>
-                            </div>
-                            <span class="text-sm font-bold text-yellow-400">${player.cost}</span>
+                    <div class="group relative bg-gray-800 border-2 ${borderColor} rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-105">
+                        <!-- Immagine giocatore o placeholder -->
+                        <div class="relative h-40 bg-gradient-to-b ${bgGradient} flex items-center justify-center overflow-hidden">
+                            ${playerImageUrl 
+                                ? `<img src="${playerImageUrl}" alt="${player.playerName}" class="w-full h-full object-cover" onerror="this.style.display='none'">` 
+                                : `<div class="w-full h-full flex flex-col items-center justify-center">
+                                    <div class="w-16 h-16 rounded-full ${initialsColor} flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+                                        ${initials}
+                                    </div>
+                                   </div>`
+                            }
+                            <div class="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity bg-black"></div>
                         </div>
-                    `;
-                }
-                
-                html += `
+                        
+                        <!-- Badge ruolo in alto a destra -->
+                        <div class="absolute top-2 right-2 z-20">
+                            <div class="w-8 h-8 rounded-full ${initialsColor} flex items-center justify-center text-white font-bold text-sm border-2 border-white shadow-lg">
+                                ${roleIcons[role]}
+                            </div>
+                        </div>
+                        
+                        <!-- Info giocatore -->
+                        <div class="p-3 bg-gray-800 border-t ${borderColor}">
+                            <h5 class="text-sm font-bold text-white mb-1 line-clamp-2 group-hover:text-yellow-300 transition-colors">
+                                ${player.playerName}
+                            </h5>
+                            <p class="text-xs text-gray-400 mb-2 line-clamp-1">
+                                ${player.serieATeam}
+                            </p>
+                            <div class="flex justify-between items-center pt-2 border-t border-gray-700">
+                                <span class="text-xs text-gray-500">Costo</span>
+                                <span class="text-sm font-bold text-yellow-300">${player.cost}</span>
+                            </div>
                         </div>
                     </div>
                 `;
             }
+            
+            html += `
+                    </div>
+                </div>
+            `;
         }
         
         html += `
@@ -681,10 +869,8 @@ const renderSquadsView = (squadsMap) => {
         `;
     }
     
-    html += '</div>';
-    
     if (squadsMap.size === 0) {
-        html = '<p class="text-center text-gray-500 py-8">Nessuna squadra trovata.</p>';
+        html = '<p class="col-span-full text-center text-gray-400 py-12 text-lg">Nessuna squadra trovata.</p>';
     }
     
     container.innerHTML = html;
@@ -694,7 +880,7 @@ const renderSquadsView = (squadsMap) => {
  * Filtra la vista delle rose
  */
 export const filterSquadView = () => {
-    const filterValue = document.getElementById('squad-filter').value;
+    const filterValue = document.getElementById('squads-filter').value;
     
     if (!currentSquadsData || currentSquadsData.size === 0) return;
     
@@ -749,5 +935,6 @@ window.clearPlayerStats = clearPlayerStats;
 window.clearSquadsData = clearSquadsData;
 window.loadSquadsData = loadSquadsData;
 window.filterSquadView = filterSquadView;
+window.filterSquads = filterSquadView; // Alias per compatibilità HTML
 window.loadLeagueStatsData = loadLeagueStatsData;
 window.loadStandingsTrendChart = loadStandingsTrendChart;

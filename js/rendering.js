@@ -37,9 +37,9 @@ export const formatDateItalian = (dateString) => {
  * @param {Array} results - Array dei risultati
  */
 export const renderHistoricResults = (results) => {
-    const tableBody = document.getElementById('historic-results-table');
-    if (!tableBody) return;
-    tableBody.innerHTML = '';
+    const tableContainer = document.getElementById('historic-results-table').parentElement;
+    const table = document.getElementById('historic-results-table');
+    if (!table) return;
 
     // Raggruppa i risultati per giornata
     const resultsByGiornata = results.reduce((acc, res) => {
@@ -47,8 +47,6 @@ export const renderHistoricResults = (results) => {
         (acc[giornata] = acc[giornata] || []).push(res);
         return acc;
     }, {});
-
-    const resultMap = { '1': 'Vittoria Casa (1)', 'X': 'Pareggio (X)', '2': 'Vittoria Ospite (2)' };
 
     // Helper: estrai numero dalla stringa
     const extractNumber = s => {
@@ -59,52 +57,162 @@ export const renderHistoricResults = (results) => {
     // Ordina le giornate
     const sortedGiornate = Object.keys(resultsByGiornata).sort((a, b) => extractNumber(a) - extractNumber(b));
 
-    // Costruisci DOM usando fragment
-    const frag = document.createDocumentFragment();
+    // Popola il select per filtrare per giornata
+    const giornataFilter = document.getElementById('historic-giornata-filter');
+    if (giornataFilter) {
+        const currentValue = giornataFilter.value;
+        giornataFilter.innerHTML = '<option value="all">Tutte le giornate</option>';
+        
+        sortedGiornate.forEach(giornata => {
+            const option = document.createElement('option');
+            option.value = giornata;
+            option.textContent = giornata.startsWith('Aggiunta Manuale') ? giornata : `Giornata ${giornata}`;
+            giornataFilter.appendChild(option);
+        });
+        
+        if (currentValue && giornataFilter.querySelector(`option[value="${currentValue}"]`)) {
+            giornataFilter.value = currentValue;
+        }
+    }
+
+    // Ricrea il container con layout moderno (non più tabella)
+    let html = '';
 
     sortedGiornate.forEach(giornata => {
-        // Ordina le partite per data
-        resultsByGiornata[giornata].sort((a, b) => new Date(a.date) - new Date(b.date));
+        const matches = resultsByGiornata[giornata];
+        matches.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // Raggruppa per data all'interno della giornata
+        const matchesByDate = matches.reduce((acc, match) => {
+            const date = match.date || 'Senza Data';
+            (acc[date] = acc[date] || []).push(match);
+            return acc;
+        }, {});
+
+        const sortedDates = Object.keys(matchesByDate).sort((a, b) => new Date(a) - new Date(b));
 
         // Intestazione Giornata
-        const headerRow = document.createElement('tr');
-        headerRow.className = 'giornata-header bg-gray-700';
-        headerRow.innerHTML = `<th colspan="6" class="text-left">${giornata.startsWith('Aggiunta Manuale') ? giornata : 'Giornata ' + giornata}</th>`;
-        frag.appendChild(headerRow);
+        html += `
+            <div class="mb-8" data-giornata="${giornata}">
+                <div class="border-b-2 border-blue-500 pb-3 mb-5">
+                    <h3 class="text-2xl font-bold text-blue-400">
+                        ${giornata.startsWith('Aggiunta Manuale') ? giornata : `Giornata ${giornata}`}
+                    </h3>
+                </div>
+        `;
 
-        // Partite della Giornata
-        resultsByGiornata[giornata].forEach(res => {
-            const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-800';
-            
-            // Classi per evidenziare il vincitore
-            let homeTeamClass = 'text-white font-semibold';
-            let awayTeamClass = 'text-white font-semibold';
-            
-            if (res.result === '1') {
-                homeTeamClass = 'text-blue-400 font-bold';
-                awayTeamClass = 'text-gray-500 font-normal';
-            } else if (res.result === '2') {
-                homeTeamClass = 'text-gray-500 font-normal';
-                awayTeamClass = 'text-blue-400 font-bold';
-            } else if (res.result === 'X') {
-                homeTeamClass = 'text-orange-400 font-semibold';
-                awayTeamClass = 'text-orange-400 font-semibold';
-            }
-            
-            row.innerHTML = `
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${giornata}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-blue-400 font-medium">${formatDateItalian(res.date)}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm ${homeTeamClass}">${res.homeTeam}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm ${awayTeamClass}">${res.awayTeam}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-center ${res.result === '1' ? 'text-green-500' : res.result === '2' ? 'text-red-500' : 'text-yellow-500'}">${resultMap[res.result] || '-'}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-center text-blue-400">${res.score || '-'}</td>
+        // Per ogni data della giornata
+        sortedDates.forEach(date => {
+            html += `
+                <div class="mb-6" data-giornata="${giornata}">
+                    <div class="text-sm font-semibold text-gray-400 mb-3 ml-2">
+                        ${formatDateItalian(date)}
+                    </div>
             `;
-            frag.appendChild(row);
+
+            // Partite della data
+            matchesByDate[date].forEach(res => {
+                const homeLogo = getTeamLogo(res.homeTeam);
+                const awayLogo = getTeamLogo(res.awayTeam);
+                
+                const [homeGoals, awayGoals] = (res.score && res.score !== 'N/A' && res.score !== '-') 
+                    ? res.score.split('-').map(s => parseInt(s.trim(), 10) || 0)
+                    : [0, 0];
+
+                // Semplifica i colori: solo 2 stati - Pareggio (giallo) e Vittoria (verde)
+                let scoreColor = 'text-gray-300';
+                let resultBadgeClass = 'bg-gray-700 text-gray-300';
+                let homeTeamClass = 'text-gray-400';
+                let awayTeamClass = 'text-gray-400';
+                let homeTeamLogoOpacity = 'opacity-50';
+                let awayTeamLogoOpacity = 'opacity-50';
+
+                if (res.result === 'X') {
+                    // Pareggio
+                    resultBadgeClass = 'bg-yellow-600 text-white';
+                    scoreColor = 'text-yellow-400';
+                    homeTeamClass = 'text-yellow-300 font-bold';
+                    awayTeamClass = 'text-yellow-300 font-bold';
+                    homeTeamLogoOpacity = 'opacity-100';
+                    awayTeamLogoOpacity = 'opacity-100';
+                } else {
+                    // Vittoria (sia casa che ospiti)
+                    resultBadgeClass = 'bg-green-600 text-white';
+                    scoreColor = 'text-green-400';
+                    
+                    if (res.result === '1') {
+                        // Casa vince
+                        homeTeamClass = 'text-green-300 font-bold';
+                        awayTeamClass = 'text-gray-500';
+                        homeTeamLogoOpacity = 'opacity-100';
+                        awayTeamLogoOpacity = 'opacity-40';
+                    } else if (res.result === '2') {
+                        // Ospiti vincono
+                        homeTeamClass = 'text-gray-500';
+                        awayTeamClass = 'text-green-300 font-bold';
+                        homeTeamLogoOpacity = 'opacity-40';
+                        awayTeamLogoOpacity = 'opacity-100';
+                    }
+                }
+
+                html += `
+                    <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-3 hover:bg-gray-750 transition-colors cursor-pointer">
+                        <div class="flex items-center justify-between">
+                            <!-- Home Team -->
+                            <div class="flex items-center flex-1 gap-3">
+                                ${homeLogo ? `
+                                    <img src="${homeLogo}" alt="${res.homeTeam}" class="w-10 h-10 object-contain ${homeTeamLogoOpacity}" onerror="this.style.display='none'">
+                                ` : ''}
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold ${homeTeamClass} truncate">${res.homeTeam}</p>
+                                </div>
+                            </div>
+
+                            <!-- Score -->
+                            <div class="flex items-center gap-3 mx-4">
+                                <div class="text-center">
+                                    <div class="text-2xl font-black ${scoreColor}">
+                                        ${res.score ? res.score.split('-').map(s => s.trim()).join('-') : '-'}
+                                    </div>
+                                    <span class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded ${resultBadgeClass}">
+                                        ${res.result === '1' ? '1' : res.result === '2' ? '2' : res.result === 'X' ? 'X' : '?'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Away Team -->
+                            <div class="flex items-center flex-1 gap-3 justify-end">
+                                <div class="flex-1 min-w-0 text-right">
+                                    <p class="text-sm font-bold ${awayTeamClass} truncate">${res.awayTeam}</p>
+                                </div>
+                                ${awayLogo ? `
+                                    <img src="${awayLogo}" alt="${res.awayTeam}" class="w-10 h-10 object-contain ${awayTeamLogoOpacity}" onerror="this.style.display='none'">
+                                ` : ''}
+                            </div>
+                        </div>
+                        <!-- FantaBet Points Row -->
+                        <div class="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between text-xs">
+                            <div class="text-center flex-1">
+                                <span class="text-gray-500">Punti</span>
+                                <p class="text-blue-300 font-bold text-sm">${res.homePoints || '-'}</p>
+                            </div>
+                            <div class="px-2 text-gray-500">vs</div>
+                            <div class="text-center flex-1">
+                                <span class="text-gray-500">Punti</span>
+                                <p class="text-blue-300 font-bold text-sm">${res.awayPoints || '-'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
         });
+
+        html += `</div>`;
     });
 
-    tableBody.appendChild(frag);
+    table.innerHTML = html;
 };
 
 // ===================================
@@ -168,8 +276,8 @@ export const calculateStandings = (results) => {
         }
         
         // Fantasy points (se presenti)
-        if (res.homeFantasyPoints) home.fantasyPoints += parseFloat(res.homeFantasyPoints) || 0;
-        if (res.awayFantasyPoints) away.fantasyPoints += parseFloat(res.awayFantasyPoints) || 0;
+        if (res.homePoints) home.fantasyPoints += parseFloat(res.homePoints) || 0;
+        if (res.awayPoints) away.fantasyPoints += parseFloat(res.awayPoints) || 0;
     });
     
     // Converti in array e ordina
@@ -229,20 +337,39 @@ export const renderStandings = (sortColumn = null) => {
     
     let html = `
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-gray-300" style="table-layout: fixed;">
+            <table class="w-full text-left text-gray-300">
                 <thead class="bg-gray-700/80 text-gray-400 text-xs uppercase">
                     <tr>
-                        <th style="width: 30px; padding: 0.5rem 0.25rem; text-align: center;">#</th>
-                        <th style="width: 35px; padding: 0.5rem 0.15rem;"></th>
-                        <th style="width: 60px; padding: 0.5rem 0.25rem; text-align: left; cursor: pointer;" onclick="renderStandings('team')">
+                        <th class="px-2 py-2 text-center w-8">#</th>
+                        <th class="px-1 py-2 w-10"></th>
+                        <th class="px-2 py-2 text-left cursor-pointer" onclick="renderStandings('team')">
                             Squadra${getSortIndicator('team')}
                         </th>
-                        <th style="width: 35px; padding: 0.5rem 0.15rem; text-align: center; cursor: pointer;" onclick="renderStandings('points')">
+                        <th class="px-2 py-2 text-center w-10 cursor-pointer" onclick="renderStandings('points')">
                             Pt${getSortIndicator('points')}
                         </th>
-                        <th style="width: 40px; padding: 0.5rem 0.15rem; text-align: center; cursor: pointer;" onclick="renderStandings('fantasyPoints')">
+                        <th class="px-2 py-2 text-center w-12 cursor-pointer hidden md:table-cell" onclick="renderStandings('fantasyPoints')">
                             FPt${getSortIndicator('fantasyPoints')}
                         </th>
+                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('played')">
+                            G${getSortIndicator('played')}
+                        </th>
+                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('wins')">
+                            V${getSortIndicator('wins')}
+                        </th>
+                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('draws')">
+                            P${getSortIndicator('draws')}
+                        </th>
+                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('losses')">
+                            S${getSortIndicator('losses')}
+                        </th>
+                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('goalsFor')">
+                            GF${getSortIndicator('goalsFor')}
+                        </th>
+                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('goalsAgainst')">
+                            GS${getSortIndicator('goalsAgainst')}
+                        </th>
+                        <th class="px-2 py-2 text-center w-10 hidden md:table-cell">DR</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-700/50">
@@ -257,21 +384,29 @@ export const renderStandings = (sortColumn = null) => {
         
         const goalDiff = team.goalsFor - team.goalsAgainst;
         const goalDiffText = goalDiff > 0 ? `+${goalDiff}` : goalDiff.toString();
+        const goalDiffClass = goalDiff > 0 ? 'text-green-400' : goalDiff < 0 ? 'text-red-400' : 'text-gray-400';
         
         html += `
             <tr class="hover:bg-gray-700/50 transition-colors cursor-pointer" onclick="showTeamStats('${team.team.replace(/'/g, "\\'")}')">
-                <td style="padding: 0.5rem 0.25rem; text-align: center;" class="${posClass}">${pos}</td>
-                <td style="padding: 0.5rem 0.15rem;">
+                <td class="px-2 py-2 text-center ${posClass}">${pos}</td>
+                <td class="px-1 py-2">
                     <img src="${getTeamLogo(team.team)}" alt="${team.team}" 
                          class="w-7 h-7 object-contain mx-auto" 
                          onerror="this.style.display='none'">
                 </td>
-                <td style="padding: 0.5rem 0.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" 
-                    class="font-semibold text-white text-sm" title="${team.team}">
-                    ${team.team.length > 10 ? team.team.substring(0, 10) + '...' : team.team}
+                <td class="px-2 py-2 font-semibold text-white text-sm" title="${team.team}">
+                    <span class="md:hidden">${team.team.length > 10 ? team.team.substring(0, 10) + '...' : team.team}</span>
+                    <span class="hidden md:inline">${team.team}</span>
                 </td>
-                <td style="padding: 0.5rem 0.15rem; text-align: center;" class="font-bold text-blue-400">${team.points}</td>
-                <td style="padding: 0.5rem 0.15rem; text-align: center;" class="text-green-400">${team.fantasyPoints.toFixed(1)}</td>
+                <td class="px-2 py-2 text-center font-bold text-blue-400">${team.points}</td>
+                <td class="px-2 py-2 text-center text-green-400 hidden md:table-cell">${team.fantasyPoints.toFixed(1)}</td>
+                <td class="px-2 py-2 text-center hidden md:table-cell">${team.played}</td>
+                <td class="px-2 py-2 text-center text-green-400 hidden md:table-cell">${team.wins}</td>
+                <td class="px-2 py-2 text-center text-yellow-400 hidden md:table-cell">${team.draws}</td>
+                <td class="px-2 py-2 text-center text-red-400 hidden md:table-cell">${team.losses}</td>
+                <td class="px-2 py-2 text-center hidden md:table-cell">${team.goalsFor}</td>
+                <td class="px-2 py-2 text-center hidden md:table-cell">${team.goalsAgainst}</td>
+                <td class="px-2 py-2 text-center ${goalDiffClass} hidden md:table-cell">${goalDiffText}</td>
             </tr>
         `;
     });
@@ -610,13 +745,302 @@ export const renderStatistics = () => {
 // RENDERING ANDAMENTO CLASSIFICA
 // ===================================
 
+let standingsTrendChart = null;
+
 /**
- * Renderizza il trend della classifica (placeholder)
+ * Calcola il trend della classifica per ogni giornata
+ */
+const calculateStandingsTrend = () => {
+    const allResults = state.getAllResults();
+    
+    // Raggruppa i risultati per giornata
+    const resultsByGiornata = new Map();
+    allResults.forEach(r => {
+        const giornataNum = parseInt(r.giornata) || 0;
+        if (giornataNum > 0) {
+            if (!resultsByGiornata.has(giornataNum)) {
+                resultsByGiornata.set(giornataNum, []);
+            }
+            resultsByGiornata.get(giornataNum).push(r);
+        }
+    });
+    
+    if (resultsByGiornata.size === 0) return null;
+    
+    // Ordina le giornate
+    const sortedGiornate = Array.from(resultsByGiornata.keys()).sort((a, b) => a - b);
+    
+    // Calcola la classifica progressiva per ogni giornata
+    const teamTrends = new Map();
+    const allTeamsSet = new Set();
+    
+    // Raccogli tutte le squadre
+    allResults.forEach(r => {
+        allTeamsSet.add(r.homeTeam);
+        allTeamsSet.add(r.awayTeam);
+    });
+    
+    // Inizializza le squadre
+    allTeamsSet.forEach(team => {
+        teamTrends.set(team, []);
+    });
+    
+    // Per ogni giornata, calcola la classifica cumulativa
+    let cumulativeResults = [];
+    sortedGiornate.forEach(giornata => {
+        const giornataResults = resultsByGiornata.get(giornata);
+        cumulativeResults = [...cumulativeResults, ...giornataResults];
+        
+        // Calcola classifica fino a questa giornata
+        const standings = [];
+        allTeamsSet.forEach(teamName => {
+            const teamResults = cumulativeResults.filter(r => 
+                r.homeTeam === teamName || r.awayTeam === teamName
+            );
+            
+            let points = 0;
+            let fantasyPoints = 0;
+            let goalsFor = 0;
+            let goalsAgainst = 0;
+            
+            teamResults.forEach(r => {
+                if (r.homeTeam === teamName) {
+                    if (r.result === '1') points += 3;
+                    else if (r.result === 'X') points += 1;
+                    
+                    if (r.score && r.score.includes('-')) {
+                        const [home, away] = r.score.split('-').map(g => parseInt(g.trim(), 10));
+                        if (!isNaN(home) && !isNaN(away)) {
+                            goalsFor += home;
+                            goalsAgainst += away;
+                        }
+                    }
+                    
+                    if (r.homePoints) fantasyPoints += r.homePoints;
+                } else {
+                    if (r.result === '2') points += 3;
+                    else if (r.result === 'X') points += 1;
+                    
+                    if (r.score && r.score.includes('-')) {
+                        const [home, away] = r.score.split('-').map(g => parseInt(g.trim(), 10));
+                        if (!isNaN(home) && !isNaN(away)) {
+                            goalsFor += away;
+                            goalsAgainst += home;
+                        }
+                    }
+                    
+                    if (r.awayPoints) fantasyPoints += r.awayPoints;
+                }
+            });
+            
+            standings.push({
+                team: teamName,
+                points: points,
+                fantasyPoints: fantasyPoints,
+                goalDifference: goalsFor - goalsAgainst,
+                goalsFor: goalsFor,
+                goalsAgainst: goalsAgainst
+            });
+        });
+        
+        // Ordina usando lo stesso criterio della classifica principale
+        standings.sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            if (b.fantasyPoints !== a.fantasyPoints) return b.fantasyPoints - a.fantasyPoints;
+            if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+            if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+            if (a.goalsAgainst !== b.goalsAgainst) return a.goalsAgainst - b.goalsAgainst;
+            return 0;
+        });
+        
+        // Salva la posizione di ogni squadra in questa giornata
+        standings.forEach((team, index) => {
+            teamTrends.get(team.team).push({
+                giornata: giornata,
+                position: index + 1,
+                points: team.points
+            });
+        });
+    });
+    
+    return {
+        giornate: sortedGiornate,
+        teamTrends: teamTrends
+    };
+};
+
+/**
+ * Renderizza il trend della classifica con Chart.js
  */
 export const renderStandingsTrend = () => {
-    // Questa funzione richiede Chart.js per il grafico
-    // Implementazione completa rimandata
-    console.log('renderStandingsTrend: TODO - implementare con Chart.js');
+    const canvas = document.getElementById('standings-trend-chart');
+    const placeholder = document.getElementById('standings-trend-placeholder');
+    
+    if (!canvas) return;
+    
+    const trendData = calculateStandingsTrend();
+    
+    if (!trendData) {
+        if (placeholder) placeholder.style.display = 'flex';
+        if (canvas) canvas.style.display = 'none';
+        return;
+    }
+    
+    const { giornate, teamTrends } = trendData;
+    
+    // Nascondi placeholder e mostra canvas
+    if (placeholder) placeholder.style.display = 'none';
+    if (canvas) canvas.style.display = 'block';
+    
+    // Distruggi il grafico precedente se esiste
+    if (standingsTrendChart) {
+        standingsTrendChart.destroy();
+    }
+    
+    // Colori per ogni squadra
+    const teamColors = [
+        { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+        { border: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+        { border: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+        { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+        { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
+        { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)' },
+        { border: '#14b8a6', bg: 'rgba(20, 184, 166, 0.1)' },
+        { border: '#f97316', bg: 'rgba(249, 115, 22, 0.1)' },
+        { border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
+        { border: '#84cc16', bg: 'rgba(132, 204, 22, 0.1)' }
+    ];
+    
+    // Ordina le squadre per posizione finale
+    const finalStandings = Array.from(teamTrends.entries())
+        .map(([team, trend]) => ({
+            team: team,
+            finalPosition: trend[trend.length - 1].position,
+            trend: trend
+        }))
+        .sort((a, b) => a.finalPosition - b.finalPosition);
+    
+    // Prepara i dataset per Chart.js
+    const datasets = finalStandings.map(({ team, trend }, idx) => {
+        const color = teamColors[idx % teamColors.length];
+        
+        const positions = giornate.map(g => {
+            const data = trend.find(t => t.giornata === g);
+            return data ? data.position : null;
+        });
+        
+        return {
+            label: team,
+            data: positions,
+            borderColor: color.border,
+            backgroundColor: color.bg,
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.1,
+            fill: false
+        };
+    });
+    
+    // Crea il grafico
+    const ctx = canvas.getContext('2d');
+    standingsTrendChart = new window.Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: giornate.map(g => `G${g}`),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: window.innerWidth < 768 ? 1 : 2,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                title: {
+                    display: false
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        color: '#e0e7ff',
+                        padding: 12,
+                        font: {
+                            size: window.innerWidth < 768 ? 10 : 12
+                        },
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleColor: '#e0e7ff',
+                    bodyColor: '#e0e7ff',
+                    borderColor: '#1e3a8a',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: true,
+                    callbacks: {
+                        label: function(context) {
+                            const teamName = context.dataset.label;
+                            const position = context.parsed.y;
+                            return `${teamName}: ${position}° posto`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    reverse: true,
+                    beginAtZero: false,
+                    ticks: {
+                        color: '#9ca3af',
+                        stepSize: 1,
+                        callback: function(value) {
+                            return value + '°';
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(75, 85, 99, 0.3)',
+                        drawBorder: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Posizione',
+                        color: '#9ca3af',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#9ca3af',
+                        maxRotation: 45,
+                        minRotation: 45,
+                        font: {
+                            size: window.innerWidth < 768 ? 9 : 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(75, 85, 99, 0.2)',
+                        drawBorder: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Giornata',
+                        color: '#9ca3af',
+                        font: {
+                            size: 12
+                        }
+                    }
+                }
+            }
+        }
+    });
 };
 
 // ===================================
@@ -881,6 +1305,28 @@ export const closeTeamStatsModal = () => {
     }
 };
 
+/**
+ * Filtra i risultati storici per giornata selezionata
+ */
+export const filterHistoricResults = () => {
+    const giornataFilter = document.getElementById('historic-giornata-filter');
+    if (!giornataFilter) return;
+    
+    const selectedGiornata = giornataFilter.value;
+    const container = document.getElementById('historic-results-table');
+    const giornataContainers = container.querySelectorAll('[data-giornata]');
+    
+    giornataContainers.forEach(el => {
+        const giornata = el.getAttribute('data-giornata');
+        
+        if (selectedGiornata === 'all' || giornata === selectedGiornata) {
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+        }
+    });
+};
+
 // ===================================
 // ESPORTAZIONI WINDOW
 // ===================================
@@ -892,3 +1338,4 @@ window.renderPlacedBets = renderPlacedBets;
 window.renderStatistics = renderStatistics;
 window.showTeamStats = showTeamStats;
 window.closeTeamStatsModal = closeTeamStatsModal;
+window.filterHistoricResults = filterHistoricResults;

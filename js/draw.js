@@ -282,11 +282,13 @@ export const drawNextTeam = async () => {
         if (stats.topScorer) {
             const scorerName = stats.topScorer.Name || stats.topScorer.playerName || 'Sconosciuto';
             const goalsScored = stats.topScorer.gf || stats.topScorer.Gf || 0;
+            const scorerId = stats.topScorer.playerId || stats.topScorer.Id || null;
+            const scorerImageUrl = scorerId ? `https://content.fantacalcio.it/web/campioncini/20/card/${scorerId}.png?v=466` : '';
             statsHtml += `
                 <div class="space-y-1">
                     <div class="text-xs font-semibold text-green-400 text-center tracking-wide">MIGLIOR TOPSCORER</div>
                     <div class="flex items-center justify-center space-x-3 text-base bg-green-900/20 px-4 py-2.5 rounded-lg">
-                        <span class="text-2xl">⚽</span>
+                        ${scorerImageUrl ? `<img src="${scorerImageUrl}" alt="${scorerName}" class="w-12 h-16 object-cover rounded" onerror="this.style.display='none'">` : '<span class="text-2xl">⚽</span>'}
                         <div class="text-left">
                             <div class="font-semibold text-white text-lg">${scorerName}</div>
                             <div class="text-sm text-gray-300">${goalsScored} gol</div>
@@ -301,11 +303,13 @@ export const drawNextTeam = async () => {
         if (stats.bestPlayer) {
             const bestName = stats.bestPlayer.Name || stats.bestPlayer.playerName || 'Sconosciuto';
             const fantaMedia = stats.bestPlayer.fm || stats.bestPlayer.Fm || 0;
+            const bestPlayerId = stats.bestPlayer.playerId || stats.bestPlayer.Id || null;
+            const bestPlayerImageUrl = bestPlayerId ? `https://content.fantacalcio.it/web/campioncini/20/card/${bestPlayerId}.png?v=466` : '';
             statsHtml += `
                 <div class="space-y-1">
                     <div class="text-xs font-semibold text-blue-400 text-center tracking-wide">MIGLIOR CALCIATORE FMV</div>
                     <div class="flex items-center justify-center space-x-3 text-base bg-blue-900/20 px-4 py-2.5 rounded-lg">
-                        <span class="text-2xl">⭐</span>
+                        ${bestPlayerImageUrl ? `<img src="${bestPlayerImageUrl}" alt="${bestName}" class="w-12 h-16 object-cover rounded" onerror="this.style.display='none'">` : '<span class="text-2xl">⭐</span>'}
                         <div class="text-left">
                             <div class="font-semibold text-white text-lg">${bestName}</div>
                             <div class="text-sm text-gray-300">FM ${fantaMedia.toFixed(2)}</div>

@@ -67,7 +67,8 @@ export const setAppView = async (view) => {
     // Gestione cleanup della vista precedente
     handleViewExit(previousView);
     
-    // Aggiorna lo stato
+    // Aggiorna lo stato - salva la vista precedente PRIMA di impostare quella nuova
+    state.setPreviousView(previousView);
     state.setCurrentView(view);
     
     // Nascondi tutte le sezioni
@@ -90,6 +91,14 @@ export const setAppView = async (view) => {
     
     // Aggiorna lo stato attivo nella navbar (opzionale)
     updateNavbarActiveState(view);
+};
+
+/**
+ * Torna alla vista precedente
+ */
+export const goBack = async () => {
+    const previousView = state.getPreviousView();
+    await setAppView(previousView);
 };
 
 /**
@@ -360,4 +369,5 @@ export const scrollToTop = () => {
 // ===================================
 
 window.setAppView = setAppView;
+window.goBack = goBack;
 window.showAdminTab = showAdminTab;

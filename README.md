@@ -1,5 +1,7 @@
 # FANTABet - Struttura Progetto
 
+**Versione: 3.1**
+
 ## 📁 Struttura delle Cartelle
 
 ```

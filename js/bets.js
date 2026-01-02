@@ -438,27 +438,12 @@ export const renderBetDeadlineCountdown = async (giornata) => {
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
         
-        // Colore e icona in base al tempo rimanente
-        let bgColor, borderColor, textColor, iconColor, statusIcon;
-        if (days > 2) {
-            bgColor = 'bg-green-900/20';
-            borderColor = 'border-green-500';
-            textColor = 'text-green-300';
-            iconColor = 'text-green-400';
-            statusIcon = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>`;
-        } else if (days > 0 || hours > 12) {
-            bgColor = 'bg-yellow-900/20';
-            borderColor = 'border-yellow-500';
-            textColor = 'text-yellow-300';
-            iconColor = 'text-yellow-400';
-            statusIcon = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>`;
-        } else {
-            bgColor = 'bg-red-900/20';
-            borderColor = 'border-red-500';
-            textColor = 'text-red-300';
-            iconColor = 'text-red-400';
-            statusIcon = `<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>`;
-        }
+        // Colore: VERDE se non scaduto, ROSSO se scaduto
+        const bgColor = 'bg-green-900/20';
+        const borderColor = 'border-green-500';
+        const textColor = 'text-green-300';
+        const iconColor = 'text-green-400';
+        const statusIcon = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>`;
         
         const confirmedBadge = confirmed 
             ? `<span class="ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded-full">✓ Confermato</span>`
@@ -588,27 +573,12 @@ export const renderBonusDeadlineCountdown = async (giornata) => {
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
         
-        // Colore e icona in base al tempo rimanente
-        let bgColor, borderColor, textColor, iconColor, statusIcon;
-        if (days > 2) {
-            bgColor = 'bg-green-900/20';
-            borderColor = 'border-green-500';
-            textColor = 'text-green-300';
-            iconColor = 'text-green-400';
-            statusIcon = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>`;
-        } else if (days > 0 || hours > 12) {
-            bgColor = 'bg-yellow-900/20';
-            borderColor = 'border-yellow-500';
-            textColor = 'text-yellow-300';
-            iconColor = 'text-yellow-400';
-            statusIcon = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>`;
-        } else {
-            bgColor = 'bg-red-900/20';
-            borderColor = 'border-red-500';
-            textColor = 'text-red-300';
-            iconColor = 'text-red-400';
-            statusIcon = `<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>`;
-        }
+        // Colore: VERDE se non scaduto, ROSSO se scaduto
+        const bgColor = 'bg-green-900/20';
+        const borderColor = 'border-green-500';
+        const textColor = 'text-green-300';
+        const iconColor = 'text-green-400';
+        const statusIcon = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>`;
         
         const confirmedBadge = confirmed 
             ? `<span class="ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded-full">✓ Confermato</span>`
@@ -930,7 +900,7 @@ export const renderOpenMatches = (matches, nextGiornata) => {
 /**
  * Renderizza le scommesse già piazzate dall'utente
  */
-export const renderPlacedBets = (userBets) => {
+export const renderPlacedBets = (userBets, allResults = []) => {
     const listContainer = document.getElementById('user-placed-bets-list');
     if (!listContainer) return;
     listContainer.innerHTML = '';
@@ -979,18 +949,50 @@ export const renderPlacedBets = (userBets) => {
                 </div>
             `;
 
-            // Mostra i pronostici
+            // Mostra i pronostici con risultati
             if (bet.predictions && bet.predictions.length > 0) {
                 betHTML += '<div class="space-y-2">';
                 bet.predictions.forEach(pred => {
+                    // Cerca il risultato per questa partita
+                    const result = allResults.find(r => 
+                        r.homeTeam === pred.homeTeam && r.awayTeam === pred.awayTeam
+                    );
+                    
+                    let isCorrect = false;
+                    let resultText = 'In sospeso';
+                    let resultColor = 'text-gray-400';
+                    let bgColor = 'bg-gray-800';
+                    let borderColor = 'border-gray-700';
+                    
+                    if (result) {
+                        // Controlla se la previsione è corretta
+                        isCorrect = (pred.prediction === result.result);
+                        resultText = `Risultato: ${result.result === '1' ? 'Casa vince' : result.result === '2' ? 'Ospiti vincono' : 'Pareggio'} (${result.score || 'N/A'})`;
+                        
+                        if (isCorrect) {
+                            resultColor = 'text-green-400 font-bold';
+                            bgColor = 'bg-green-900/20';
+                            borderColor = 'border-green-600';
+                        } else {
+                            resultColor = 'text-red-400 font-bold';
+                            bgColor = 'bg-red-900/20';
+                            borderColor = 'border-red-600';
+                        }
+                    }
+                    
+                    const statusIcon = isCorrect ? '✓' : (result ? '✗' : '⏳');
+                    
                     betHTML += `
-                        <div class="p-2 bg-gray-800 rounded-lg border border-gray-700">
-                            <div class="flex justify-between items-center">
+                        <div class="p-3 ${bgColor} rounded-lg border ${borderColor}">
+                            <div class="flex justify-between items-start">
                                 <div class="flex-1">
                                     <div class="font-semibold">${pred.homeTeam || '-'} vs ${pred.awayTeam || '-'}</div>
-                                    <div class="text-sm text-gray-400">
+                                    <div class="text-sm text-gray-400 mt-1">
                                         Pronostico: <span class="font-bold text-blue-400">${pred.prediction}</span> 
                                         (Quota: ${pred.odds ? parseFloat(pred.odds).toFixed(2) : '-'})
+                                    </div>
+                                    <div class="text-sm ${resultColor} mt-1">
+                                        ${statusIcon} ${resultText}
                                     </div>
                                 </div>
                             </div>
@@ -1303,6 +1305,28 @@ export const calculateStandings = () => {
     return standings;
 };
 
+/**
+ * Toggle visibilità scommesse salvate
+ */
+export const toggleSavedBets = () => {
+    const container = document.getElementById('user-placed-bets-container');
+    const btn = document.getElementById('toggle-saved-bets-btn');
+    const icon = document.getElementById('toggle-saved-bets-icon');
+    const btnText = btn.querySelector('span');
+    
+    if (container.classList.contains('hidden')) {
+        // Mostra
+        container.classList.remove('hidden');
+        btnText.textContent = 'Nascondi scommesse salvate';
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        // Nascondi
+        container.classList.add('hidden');
+        btnText.textContent = 'Mostra scommesse salvate';
+        icon.style.transform = 'rotate(0deg)';
+    }
+};
+
 // Esporta funzioni per uso globale (window)
 export const setupGlobalBetsFunctions = () => {
     window.recordPrediction = recordPrediction;
@@ -1312,4 +1336,5 @@ export const setupGlobalBetsFunctions = () => {
     window.calculateStandings = calculateStandings;
     window.calculateTeamStats = calculateTeamStats;
     window.setupAdminBetsListener = setupAdminBetsListener;
+    window.toggleSavedBets = toggleSavedBets;
 };

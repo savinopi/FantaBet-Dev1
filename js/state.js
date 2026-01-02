@@ -79,6 +79,9 @@ export let currentBetsFilter = 'all';
 /** Vista corrente */
 export let currentView = 'home';
 
+/** Vista precedente */
+export let previousView = 'home';
+
 // ===================================
 // DATI ROSE E CALCIATORI
 // ===================================
@@ -133,6 +136,7 @@ export const setCurrentActiveBonusGiornata = (giornata) => { currentActiveBonusG
 export const setCurrentBetsFilter = (filter) => { currentBetsFilter = filter; };
 
 export const setCurrentView = (view) => { currentView = view; };
+export const setPreviousView = (view) => { previousView = view; };
 
 export const setSquadsData = (data) => { squadsData = data; };
 export const setPlayerStatsData = (data) => { playerStatsData = data; };
@@ -164,6 +168,7 @@ export const getCurrentActiveBonusGiornata = () => currentActiveBonusGiornata;
 export const getCurrentBetsFilter = () => currentBetsFilter;
 
 export const getCurrentView = () => currentView;
+export const getPreviousView = () => previousView;
 
 export const getSquadsData = () => squadsData;
 export const getPlayerStatsData = () => playerStatsData;

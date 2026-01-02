@@ -186,7 +186,9 @@ export const checkAdminStatus = async () => {
     // Prima controlla se è nella lista admin hardcoded
     if (ADMIN_USER_IDS.includes(userId)) {
         isUserAdmin = true;
+        console.log('[DEBUG ADMIN] User is in hardcoded admin list:', userId);
         updateAdminUI(true);
+        updateUserInfoDisplay();
         return;
     }
     
@@ -194,13 +196,24 @@ export const checkAdminStatus = async () => {
     try {
         const userDocRef = doc(getUsersCollectionRef(), userId);
         const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists() && userDoc.data().isAdmin) {
-            isUserAdmin = true;
-            updateAdminUI(true);
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            console.log('[DEBUG ADMIN] User doc data:', userData);
+            if (userData.isAdmin) {
+                isUserAdmin = true;
+                console.log('[DEBUG ADMIN] User is admin in database');
+                updateAdminUI(true);
+            } else {
+                isUserAdmin = false;
+                console.log('[DEBUG ADMIN] User is NOT admin in database');
+                updateAdminUI(false);
+            }
         } else {
             isUserAdmin = false;
+            console.log('[DEBUG ADMIN] User doc does not exist');
             updateAdminUI(false);
         }
+        updateUserInfoDisplay();
     } catch (error) {
         console.error('Errore verifica admin:', error);
         isUserAdmin = false;
@@ -236,13 +249,21 @@ export const updateUserInfoDisplay = () => {
     const userRoleElement = document.getElementById('user-role-display');
     const userIdElement = document.getElementById('user-id-display');
 
-    if (userCreditsElement) userCreditsElement.textContent = `Crediti Bonus: ${userCredits}`;
+    console.log('[DEBUG PROFILE] Updating display - Profile:', currentUserProfile, 'isAdmin:', isUserAdmin);
+
+    if (userCreditsElement) userCreditsElement.textContent = `Crediti: ${userCredits}`;
+    
     if (userDisplayNameElement && currentUserProfile) { 
-        userDisplayNameElement.textContent = currentUserProfile.displayName || currentUserProfile.email;
+        const displayText = currentUserProfile.displayName || currentUserProfile.email || 'Utente';
+        userDisplayNameElement.textContent = displayText;
+        console.log('[DEBUG PROFILE] Display name set to:', displayText);
     }
+    
     if (userRoleElement) {
-        userRoleElement.textContent = isUserAdmin ? 'Admin' : 'Utente';
+        userRoleElement.textContent = isUserAdmin ? '👤 Admin' : '👤 Utente';
+        console.log('[DEBUG PROFILE] Role set to:', isUserAdmin ? 'Admin' : 'Utente');
     }
+    
     if (userIdElement && userId) {
         userIdElement.textContent = `ID: ${userId}`;
     }

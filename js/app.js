@@ -130,6 +130,10 @@ import {
 } from './bonus.js';
 
 import {
+    loadLeagueStatsData
+} from './league-stats.js';
+
+import {
     startDraw,
     drawNextTeam,
     resetDraw,
@@ -161,7 +165,6 @@ import {
     loadPlayerLeaderboards,
     loadSquadsData,
     filterSquadView,
-    loadLeagueStatsData,
     loadStandingsTrendChart
 } from './player-stats.js';
 
@@ -264,16 +267,47 @@ const setupFirebase = async () => {
 // LISTENER PROFILO UTENTE
 // ===================================
 
-const setupUserProfileListener = (uid) => {
-    const userDocRef = doc(getUsersCollectionRef(), uid);
+const setupUserProfileListener = async (uid) => {
+    if (!uid) return;
     
-    addUnsubscribe(
-        onSnapshot(userDocRef, (snapshot) => {
+    try {
+        const userDocRef = doc(getUsersCollectionRef(), uid);
+        console.log('[DEBUG LISTENER] Impostazione listener profilo per uid:', uid);
+        
+        // STEP 1: VERIFICA PRIMA SE IL DOCUMENTO ESISTE
+        const docSnap = await getDoc(userDocRef);
+        console.log('[DEBUG LISTENER] getDoc risultato - exists:', docSnap.exists(), '| data:', docSnap.data());
+        
+        if (!docSnap.exists()) {
+            // STEP 2: SE NON ESISTE, CREALO PRIMA DI IMPOSTARE IL LISTENER
+            console.log('[DEBUG LISTENER] Documento non esiste, creazione documento di default...');
+            
+            const isDefaultAdmin = ADMIN_USER_IDS.includes(uid);
+            const defaultUserData = {
+                email: auth.currentUser?.email || '',
+                displayName: auth.currentUser?.email?.split('@')[0] || 'Utente',
+                credits: 100,
+                isAdmin: isDefaultAdmin,
+                createdAt: new Date().toISOString()
+            };
+            
+            console.log('[DEBUG LISTENER] Creazione documento con:', defaultUserData);
+            await setDoc(userDocRef, defaultUserData);
+            console.log('[DEBUG LISTENER] Documento creato con successo');
+        }
+        
+        // STEP 3: ORA IMPOSTA IL LISTENER (il documento esiste con certezza)
+        const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+            console.log('[DEBUG LISTENER] Snapshot ricevuto! Exists:', snapshot.exists());
+            console.log('[DEBUG LISTENER] Snapshot data:', snapshot.data());
+            
             if (snapshot.exists()) {
                 const data = snapshot.data();
-                setCurrentUserProfile(data);
+                console.log('[DEBUG LISTENER] Dati profilo ricevuti:', data);
+                setCurrentUserProfile({ id: snapshot.id, ...data });
                 setUserCredits(data.credits || 100);
                 updateUserInfoDisplay();
+                checkAdminStatus();
                 
                 // Aggiorna elementi UI specifici
                 const squadName = data.squadName;
@@ -284,9 +318,40 @@ const setupUserProfileListener = (uid) => {
                     // Mostra pulsante bonus se l'utente ha una squadra
                     showElement('user-bonus-button-home');
                 }
+                
+                // Controlla richieste bonus pendenti per admin
+                if (isUserAdmin) {
+                    loadActiveGiornata().then(activeGiornata => {
+                        const lastCompletedGiornata = determineLastCompletedGiornata();
+                        const currentGiornata = activeGiornata || (lastCompletedGiornata + 1);
+                        const notificationShown = localStorage.getItem('bonusNotificationShown');
+                        
+                        if (notificationShown !== currentGiornata.toString()) {
+                            checkPendingBonusRequests();
+                        }
+                    });
+                }
+                
+                // Usa state.getCurrentView() per ottenere la vista corrente
+                const getCurrentView = () => state.currentView;
+                if (getCurrentView() === 'profile') {
+                    renderProfileArea();
+                }
+            } else {
+                console.warn('[DEBUG LISTENER] Documento utente non trovato per UID:', uid);
+                setCurrentUserProfile(null);
             }
-        }, (error) => console.error('Errore listener profilo:', error))
-    );
+        }, (error) => {
+            console.error('[DEBUG LISTENER] Errore onSnapshot:', error);
+        });
+        
+        addUnsubscribe(unsubscribe);
+        console.log('[DEBUG LISTENER] Listener registrato e aggiunto alla lista unsubscribe');
+        
+    } catch (error) {
+        console.error('[DEBUG LISTENER] Errore setup profilo utente:', error);
+        messageBox("Errore nella configurazione del profilo utente. Contatta l'amministratore.");
+    }
 };
 
 // ===================================
@@ -403,7 +468,7 @@ const setupListeners = () => {
         onSnapshot(qUserBets, (snapshot) => {
             const bets = snapshot.docs.map(doc => doc.data());
             state.setUserPlacedBets(bets);
-            renderPlacedBets(bets);
+            renderPlacedBets(bets, state.getAllResults());
         }, (error) => console.error("Errore onSnapshot User Placed Bets:", error))
     );
     
@@ -424,6 +489,112 @@ const setupListeners = () => {
 // FUNZIONI PLACEHOLDER
 // (Da implementare o importare dai moduli specifici)
 // ===================================
+
+const checkPendingBonusRequests = async () => {
+    // Solo per admin
+    if (!isUserAdmin) return;
+    
+    try {
+        // Usa la giornata attiva impostata dall'admin, altrimenti fallback al calcolo automatico
+        const activeGiornata = await loadActiveGiornata();
+        const lastCompletedGiornata = determineLastCompletedGiornata();
+        const currentGiornata = activeGiornata || (lastCompletedGiornata + 1);
+        
+        // Verifica se la deadline è passata (quindi la giornata è iniziata)
+        const { deadline } = await getGiornataDeadline(currentGiornata);
+        const now = new Date();
+        
+        // Mostra notifica solo se la deadline è passata (giornata iniziata)
+        if (now < deadline) return;
+        
+        // Carica tutti i bonus
+        const bonusSnapshot = await getDocs(getBonusCollectionRef());
+        const teamsWithBonusRequests = [];
+        
+        bonusSnapshot.docs.forEach(doc => {
+            const bonusData = doc.data();
+            const teamName = bonusData.teamName;
+            
+            // Controlla se c'è un bonus richiesto per questa giornata
+            const bonusTypes = ['RG', 'twoG', 'SC', 'POTM'];
+            let requestedBonus = null;
+            
+            bonusTypes.forEach(type => {
+                const usedArray = bonusData[type]?.usedInGiornata || [];
+                if (usedArray.includes(currentGiornata.toString()) || usedArray.includes(currentGiornata)) {
+                    requestedBonus = type;
+                }
+            });
+            
+            if (requestedBonus) {
+                const bonusName = requestedBonus === 'RG' ? 'Raddoppio Goal' : 
+                                 requestedBonus === 'twoG' ? 'Assegna 2 Goal' : 'Scudo';
+                teamsWithBonusRequests.push({ team: teamName, bonus: bonusName });
+            }
+        });
+        
+        // Se ci sono richieste, mostra notifica
+        if (teamsWithBonusRequests.length > 0) {
+            const teamsList = teamsWithBonusRequests
+                .map(t => `• ${t.team}: <strong>${t.bonus}</strong>`)
+                .join('<br>');
+            
+            const notification = document.createElement('div');
+            notification.id = 'bonus-notification';
+            notification.className = 'fixed top-20 right-4 z-50 max-w-md';
+            notification.innerHTML = `
+                <div class="bg-gradient-to-br from-yellow-900/95 to-orange-900/95 border-2 border-yellow-500 rounded-lg shadow-2xl p-4 animate-pulse">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <svg class="w-8 h-8 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <h3 class="text-lg font-bold text-yellow-300 mb-2">
+                                ⚡ Richieste Bonus Giornata ${currentGiornata}
+                            </h3>
+                            <p class="text-sm text-yellow-100 mb-2">
+                                ${teamsWithBonusRequests.length} squadra/e ha/hanno richiesto bonus:
+                            </p>
+                            <div class="text-sm text-white bg-black/30 rounded p-2 mb-3">
+                                ${teamsList}
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="setAppView('admin'); showAdminTab('bonus'); dismissBonusNotification();" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">
+                                    Vai ai Bonus
+                                </button>
+                                <button onclick="dismissBonusNotification()" class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition-colors">
+                                    OK, chiudi
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="dismissBonusNotification()" class="ml-2 text-yellow-300 hover:text-yellow-100">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Rimuovi notifica precedente se esiste
+            const existingNotification = document.getElementById('bonus-notification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            // Aggiungi la nuova notifica
+            document.body.appendChild(notification);
+            
+            // Salva in localStorage che abbiamo già mostrato la notifica per questa giornata
+            localStorage.setItem('bonusNotificationShown', currentGiornata.toString());
+        }
+        
+    } catch (error) {
+        console.error('Errore controllo bonus pendenti:', error);
+    }
+};
 
 const loadInitialData = async () => {
     console.log('Caricamento dati iniziali admin...');
@@ -548,7 +719,46 @@ const updateTeamSelects = (teams) => {
 };
 
 const updateMatchToCloseSelect = (matches) => {
-    // Implementazione placeholder
+    const select = document.getElementById('match-to-close-select');
+    if (!select) return; 
+    
+    // Trova l'ultima giornata con risultati (usa anche i risultati storici)
+    const lastCompletedGiornata = determineLastCompletedGiornata();
+    console.log('updateMatchToCloseSelect -> ultima completata:', lastCompletedGiornata, 'prossima:', lastCompletedGiornata + 1);
+
+        // Mostra solo le partite della prossima giornata da completare
+        const openMatches = matches
+            .filter(m => {
+                const giornata = parseInt(m.giornata || '0', 10);
+                const isNextGiornata = giornata === (lastCompletedGiornata + 1);
+                const isOpen = m.status === 'open' || !m.status;
+                
+                console.log('Valutazione partita per visualizzazione:', {
+                    partita: `${m.homeTeam} vs ${m.awayTeam}`,
+                    giornata,
+                    status: m.status,
+                    isNextGiornata,
+                    isOpen,
+                    include: isOpen && isNextGiornata
+                });
+                
+                return isOpen && isNextGiornata;
+            })
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    select.innerHTML = '<option value="">Seleziona partita da chiudere</option>';
+    
+    if (openMatches.length === 0) {
+         select.innerHTML = '<option value="">Nessuna partita aperta nella prossima giornata</option>';
+         return;
+    }
+
+    openMatches.forEach(match => {
+        const option = document.createElement('option');
+        option.value = match.id;
+        option.textContent = `G${match.giornata}: ${match.homeTeam} vs ${match.awayTeam} (${match.date})`;
+        select.appendChild(option);
+    });
 };
 
 // Le funzioni renderOpenMatches, renderPlacedBets, setupAdminBetsListener
@@ -556,8 +766,92 @@ const updateMatchToCloseSelect = (matches) => {
 // Le funzioni renderHistoricResults, renderStandings, renderStatistics, renderStandingsTrend
 // sono importate da rendering.js
 
-const renderAdminUsersList = (users) => {
-    // Implementazione placeholder
+const renderAdminUsersList = async (users) => {
+    const listContainer = document.getElementById('admin-users-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+
+    if (!users || users.length === 0) {
+        listContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Nessun utente registrato.</div>';
+        return;
+    }
+
+    // Carica le rose disponibili
+    const squadsSnapshot = await getDocs(getSquadsCollectionRef());
+    const availableSquads = squadsSnapshot.docs.map(doc => doc.data().name).sort();
+
+    users.forEach(user => {
+        const row = document.createElement('div');
+        row.className = 'bg-gray-900 rounded-lg p-4 mb-3 border border-gray-700';
+        
+        // Crea le opzioni per il select delle rose
+        let squadOptions = '<option value="">Nessuna rosa</option>';
+        availableSquads.forEach(squadName => {
+            const selected = user.fantaSquad === squadName ? 'selected' : '';
+            squadOptions += `<option value="${squadName}" ${selected}>${squadName}</option>`;
+        });
+        
+        row.innerHTML = `
+            <div class="flex flex-col space-y-3">
+                <!-- Header con email -->
+                <div class="flex items-center justify-between border-b border-gray-700 pb-2">
+                    <div class="font-medium text-white">${user.displayName || user.email || user.id}</div>
+                    <div class="text-xs text-gray-500">${user.email || ''}</div>
+                </div>
+                
+                <!-- Grid informazioni utente -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <!-- Rosa Fantacalcio -->
+                    <div class="flex flex-col">
+                        <label class="text-xs text-gray-400 mb-1">Rosa Fantacalcio</label>
+                        <select 
+                            id="squad-${user.id}" 
+                            class="bg-gray-800 text-sm p-2 rounded border border-gray-600 text-white">
+                            ${squadOptions}
+                        </select>
+                    </div>
+                    
+                    <!-- Crediti -->
+                    <div class="flex flex-col">
+                        <label class="text-xs text-gray-400 mb-1">Crediti</label>
+                        <input 
+                            type="number" 
+                            id="credits-${user.id}" 
+                            value="${user.credits || 0}" 
+                            class="bg-gray-800 text-sm p-2 rounded border border-gray-600 text-white" />
+                    </div>
+                    
+                    <!-- Admin -->
+                    <div class="flex flex-col justify-center">
+                        <label class="text-xs text-gray-400 mb-1">Ruolo</label>
+                        <label class="flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                id="isAdmin-${user.id}" 
+                                ${user.isAdmin ? 'checked' : ''}
+                                class="mr-2 w-4 h-4">
+                            <span class="text-sm ${user.isAdmin ? 'text-yellow-400 font-bold' : 'text-gray-300'}">
+                                ${user.isAdmin ? 'Admin' : 'Utente'}
+                            </span>
+                        </label>
+                    </div>
+                    
+                    <!-- Pulsante Salva -->
+                    <div class="flex items-end">
+                        <button 
+                            onclick="updateUserPermissionsAndCredits('${user.id}')" 
+                            class="btn-primary w-full text-sm py-2">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Salva
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        listContainer.appendChild(row);
+    });
 };
 
 // ===================================
@@ -642,7 +936,11 @@ window.closeStandings = () => {
 
 window.closeTeamStatsModal = () => {
     const modal = document.getElementById('team-stats-modal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = '';
+        document.body.style.overflow = '';
+    }
 };
 
 // ===================================

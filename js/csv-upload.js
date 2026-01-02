@@ -324,6 +324,23 @@ export const processSquadsFile = async () => {
                 return;
             }
 
+            // Carica prima le statistiche per ottenere i playerId
+            updateProgress(10, 'Caricamento IDs dai dati statistici...');
+            const statsCollection = getPlayerStatsCollectionRef();
+            const statsSnapshot = await getDocs(statsCollection);
+            const playerIdMap = new Map(); // Nome normalizzato -> playerId
+            
+            statsSnapshot.forEach(doc => {
+                const stat = doc.data();
+                const normalizedName = (stat.playerName || '').trim().toLowerCase();
+                playerIdMap.set(normalizedName, stat.playerId);
+            });
+            
+            console.log(`IDs caricati: ${playerIdMap.size} giocatori trovati`);
+            // Debug: mostra alcuni nomi caricati
+            const sampleNames = Array.from(playerIdMap.entries()).slice(0, 3);
+            console.log('Esempio nomi da statistiche:', sampleNames);
+
             // Parse CSV: Squadra;Ruolo;Calciatore;Squadra (Serie A);Costo
             const players = [];
             const squads = new Map(); // squadra -> array di giocatori
@@ -347,12 +364,17 @@ export const processSquadsFile = async () => {
                 if (role === 'Ruolo' || squadName === 'Squadra') continue;
                 if (!squadName || squadName.includes('Crediti Residui')) continue;
                 
+                // Cerca l'ID del giocatore
+                const normalizedName = playerName.trim().toLowerCase();
+                const playerId = playerIdMap.get(normalizedName);
+                
                 const playerData = {
                     squadName: squadName,
                     role: role,
                     playerName: playerName,
                     serieATeam: serieATeam,
-                    cost: cost
+                    cost: cost,
+                    playerId: playerId || null  // Aggiungi l'ID se trovato
                 };
                 
                 players.push(playerData);
@@ -367,15 +389,27 @@ export const processSquadsFile = async () => {
                 
                 // Aggiorna progress bar
                 if (processedLines % 10 === 0) {
-                    const progress = Math.min(50, (processedLines / lines.length) * 50);
-                    updateProgress(progress, `Processate ${processedLines} righe...`);
+                    const progress = Math.min(50, (processedLines / lines.length) * 40);
+                    updateProgress(10 + progress, `Processate ${processedLines} righe...`);
                 }
             }
             
             console.log('Rose parsate:', { 
                 totaleGiocatori: players.length, 
-                numeroSquadre: squads.size 
+                numeroSquadre: squads.size,
+                giocatoriConId: players.filter(p => p.playerId).length
             });
+            
+            // Debug: Mostra alcuni giocatori con e senza ID
+            const playersWithId = players.filter(p => p.playerId);
+            const playersWithoutId = players.filter(p => !p.playerId);
+            if (playersWithId.length > 0) {
+                console.log('Esempio giocatore CON ID:', playersWithId[0]);
+            }
+            if (playersWithoutId.length > 0) {
+                console.log('Esempio giocatore SENZA ID:', playersWithoutId[0]);
+                console.log(`Totale giocatori senza ID: ${playersWithoutId.length}`);
+            }
             
             updateProgress(50, 'Salvataggio giocatori in corso...');
             
