@@ -329,93 +329,62 @@ export const renderStandings = (sortColumn = null) => {
         });
     }
     
-    // Genera HTML tabella
-    const getSortIndicator = (col) => {
-        if (state.standingsSortColumn !== col) return '';
-        return state.standingsSortDirection === 'asc' ? ' ↑' : ' ↓';
+    // Genera HTML classifica semplice
+    // Calcola quanti caratteri mostrare in base alla risoluzione dello schermo
+    const getMaxTeamNameLength = () => {
+        const width = window.innerWidth;
+        if (width < 360) return 10;  // Extra small phones
+        if (width < 480) return 13;  // Small phones
+        if (width < 640) return 16;  // Medium phones
+        if (width < 768) return 20;  // Tablets
+        return 25; // Desktop
     };
     
-    let html = `
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-gray-300">
-                <thead class="bg-gray-700/80 text-gray-400 text-xs uppercase">
-                    <tr>
-                        <th class="px-2 py-2 text-center w-8">#</th>
-                        <th class="px-1 py-2 w-10"></th>
-                        <th class="px-2 py-2 text-left cursor-pointer" onclick="renderStandings('team')">
-                            Squadra${getSortIndicator('team')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-10 cursor-pointer" onclick="renderStandings('points')">
-                            Pt${getSortIndicator('points')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-12 cursor-pointer hidden md:table-cell" onclick="renderStandings('fantasyPoints')">
-                            FPt${getSortIndicator('fantasyPoints')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('played')">
-                            G${getSortIndicator('played')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('wins')">
-                            V${getSortIndicator('wins')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('draws')">
-                            P${getSortIndicator('draws')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('losses')">
-                            S${getSortIndicator('losses')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('goalsFor')">
-                            GF${getSortIndicator('goalsFor')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-8 hidden md:table-cell cursor-pointer" onclick="renderStandings('goalsAgainst')">
-                            GS${getSortIndicator('goalsAgainst')}
-                        </th>
-                        <th class="px-2 py-2 text-center w-10 hidden md:table-cell">DR</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-700/50">
+    let html = `<div class="bg-gray-900 rounded">
+        <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(55, 65, 81, 1); background-color: rgba(31, 41, 55, 1); white-space: nowrap;">
+            <div style="width: 30px; text-align: left; flex-shrink: 0;">
+                <span class="text-gray-400 text-xs font-bold uppercase">#</span>
+            </div>
+            <div style="width: 24px; flex-shrink: 0;"></div>
+            <div style="flex-grow: 1; text-align: left;">
+                <span class="text-gray-400 text-xs font-bold uppercase">Squadra</span>
+            </div>
+            <span class="text-gray-400 text-xs font-bold uppercase" style="width: 35px; text-align: right; flex-shrink: 0; margin-left: 0.75rem;">Pt</span>
+            <span class="text-gray-400 text-xs font-bold uppercase" style="width: 45px; text-align: center; flex-shrink: 0; margin-left: 0.5rem;">PTI</span>
+        </div>
     `;
     
     standings.forEach((team, index) => {
         const pos = index + 1;
         let posClass = 'text-gray-400';
-        if (pos === 1) posClass = 'text-yellow-400 font-bold';
-        else if (pos === 2) posClass = 'text-gray-300 font-semibold';
-        else if (pos === 3) posClass = 'text-orange-400 font-semibold';
+        if (pos === 1) {
+            posClass = 'text-yellow-400 font-bold';
+        } else if (pos === 2) {
+            posClass = 'text-gray-300 font-semibold';
+        } else if (pos === 3) {
+            posClass = 'text-orange-400 font-semibold';
+        }
         
-        const goalDiff = team.goalsFor - team.goalsAgainst;
-        const goalDiffText = goalDiff > 0 ? `+${goalDiff}` : goalDiff.toString();
-        const goalDiffClass = goalDiff > 0 ? 'text-green-400' : goalDiff < 0 ? 'text-red-400' : 'text-gray-400';
+        const fantasyPoints = team.fantasyPoints.toFixed(1);
+        const maxLength = getMaxTeamNameLength();
+        const squadraDisplay = team.team.length > maxLength ? team.team.substring(0, maxLength) + '...' : team.team;
         
         html += `
-            <tr class="hover:bg-gray-700/50 transition-colors cursor-pointer" onclick="showTeamStats('${team.team.replace(/'/g, "\\'")}')">
-                <td class="px-2 py-2 text-center ${posClass}">${pos}</td>
-                <td class="px-1 py-2">
-                    <img src="${getTeamLogo(team.team)}" alt="${team.team}" 
-                         class="w-7 h-7 object-contain mx-auto" 
-                         onerror="this.style.display='none'">
-                </td>
-                <td class="px-2 py-2 font-semibold text-white text-sm" title="${team.team}">
-                    <span class="md:hidden">${team.team.length > 10 ? team.team.substring(0, 10) + '...' : team.team}</span>
-                    <span class="hidden md:inline">${team.team}</span>
-                </td>
-                <td class="px-2 py-2 text-center font-bold text-blue-400">${team.points}</td>
-                <td class="px-2 py-2 text-center text-green-400 hidden md:table-cell">${team.fantasyPoints.toFixed(1)}</td>
-                <td class="px-2 py-2 text-center hidden md:table-cell">${team.played}</td>
-                <td class="px-2 py-2 text-center text-green-400 hidden md:table-cell">${team.wins}</td>
-                <td class="px-2 py-2 text-center text-yellow-400 hidden md:table-cell">${team.draws}</td>
-                <td class="px-2 py-2 text-center text-red-400 hidden md:table-cell">${team.losses}</td>
-                <td class="px-2 py-2 text-center hidden md:table-cell">${team.goalsFor}</td>
-                <td class="px-2 py-2 text-center hidden md:table-cell">${team.goalsAgainst}</td>
-                <td class="px-2 py-2 text-center ${goalDiffClass} hidden md:table-cell">${goalDiffText}</td>
-            </tr>
+            <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(55, 65, 81, 1); white-space: nowrap; overflow: hidden; cursor: pointer;" class="hover:bg-gray-800 transition" onclick="showTeamStats('${team.team.replace(/'/g, "\\'")}')">
+                <div style="width: 30px; text-align: center; flex-shrink: 0;">
+                    <span class="${posClass} text-lg font-bold">${pos}</span>
+                </div>
+                <img src="${getTeamLogo(team.team)}" alt="${team.team}" style="width: 24px; height: 24px; margin: 0 0.5rem 0 0.25rem; flex-shrink: 0; display: block;" onerror="this.style.display='none'">
+                <div style="flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <span class="text-white font-semibold text-sm" title="${team.team}" style="display: block;">${squadraDisplay}</span>
+                </div>
+                <span class="text-blue-400 font-bold text-sm" style="width: 35px; text-align: right; flex-shrink: 0; margin-left: 0.75rem;">${team.points}</span>
+                <span class="text-green-400 font-bold text-sm" style="width: 45px; text-align: right; flex-shrink: 0; margin-left: 0.5rem;">${fantasyPoints}</span>
+            </div>
         `;
     });
     
-    html += `
-                </tbody>
-            </table>
-        </div>
-    `;
+    html += `</div>`;
     
     container.innerHTML = html;
     
@@ -1266,20 +1235,92 @@ export const showTeamStats = async (teamName) => {
                     <div class="bg-green-600 p-3 rounded-t-xl">
                         <h3 class="font-bold text-white">⚽ TOP SCORER</h3>
                     </div>
-                    <div class="p-4 text-center">
-                        <h4 class="text-2xl font-bold text-white">${topScorer?.Name || 'N/A'}</h4>
-                        <div class="text-5xl font-black text-green-400 my-2">${topScorer?.Gf || 0}</div>
-                        <div class="text-gray-400">gol in ${topScorer?.Pv || 0} presenze</div>
+                    <div class="p-4">
+                        <div class="flex flex-col items-center mb-4">
+                            ${topScorer?.Id ? `<img src="https://content.fantacalcio.it/web/campioncini/20/card/${topScorer.Id}.png?v=466" alt="${topScorer?.Name}" class="w-24 h-32 object-cover rounded-lg shadow-2xl border-3 border-green-500 mb-3" onerror="this.style.display='none'">` : ''}
+                            <h4 class="text-2xl font-bold text-white text-center">${topScorer?.Name || 'N/A'}</h4>
+                        </div>
+                        <div class="text-5xl font-black text-green-400 text-center my-2">${topScorer?.Gf || 0}</div>
+                        <div class="text-gray-400 text-center mb-4">gol in ${topScorer?.Pv || 0} presenze</div>
+                        
+                        <!-- Barra Goal -->
+                        <div class="bg-gray-800 rounded p-2 mb-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-gray-300">Goal</span>
+                                <span class="text-xs font-bold text-green-400">${topScorer?.Gf || 0}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div class="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full" style="width: ${Math.min(((topScorer?.Gf || 0) / Math.max(topScorer?.Pv || 1, 1)) * 100, 100)}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Barra Assist -->
+                        <div class="bg-gray-800 rounded p-2 mb-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-gray-300">Assist</span>
+                                <span class="text-xs font-bold text-blue-400">${topScorer?.Ass || 0}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div class="bg-gradient-to-r from-blue-500 to-blue-400 h-2 rounded-full" style="width: ${Math.min(((topScorer?.Ass || 0) / Math.max(topScorer?.Pv || 1, 1)) * 100, 100)}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Barra Goal Contribution -->
+                        <div class="bg-gray-800 rounded p-2">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-gray-300">Goal Contribution</span>
+                                <span class="text-xs font-bold text-purple-400">${(topScorer?.Gf || 0) + (topScorer?.Ass || 0)} (${topScorer?.Gf || 0}G + ${topScorer?.Ass || 0}A) - ${(topScorer?.Gf || 0) + (topScorer?.Ass || 0)}/${topScorer?.Pv || 0}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div class="bg-gradient-to-r from-purple-500 to-purple-400 h-2 rounded-full" style="width: ${Math.min((((topScorer?.Gf || 0) + (topScorer?.Ass || 0)) / Math.max(topScorer?.Pv || 1, 1)) * 100, 100)}%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="card bg-cyan-950/30 border border-cyan-500">
                     <div class="bg-cyan-600 p-3 rounded-t-xl">
                         <h3 class="font-bold text-white">🎯 TOP ASSISTMAN</h3>
                     </div>
-                    <div class="p-4 text-center">
-                        <h4 class="text-2xl font-bold text-white">${topAssistman?.Name || 'N/A'}</h4>
-                        <div class="text-5xl font-black text-cyan-400 my-2">${topAssistman?.Ass || 0}</div>
-                        <div class="text-gray-400">assist in ${topAssistman?.Pv || 0} presenze</div>
+                    <div class="p-4">
+                        <div class="flex flex-col items-center mb-4">
+                            ${topAssistman?.Id ? `<img src="https://content.fantacalcio.it/web/campioncini/20/card/${topAssistman.Id}.png?v=466" alt="${topAssistman?.Name}" class="w-24 h-32 object-cover rounded-lg shadow-2xl border-3 border-cyan-500 mb-3" onerror="this.style.display='none'">` : ''}
+                            <h4 class="text-2xl font-bold text-white text-center">${topAssistman?.Name || 'N/A'}</h4>
+                        </div>
+                        <div class="text-5xl font-black text-cyan-400 text-center my-2">${topAssistman?.Ass || 0}</div>
+                        <div class="text-gray-400 text-center mb-4">assist in ${topAssistman?.Pv || 0} presenze</div>
+                        
+                        <!-- Barra Goal -->
+                        <div class="bg-gray-800 rounded p-2 mb-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-gray-300">Goal</span>
+                                <span class="text-xs font-bold text-green-400">${topAssistman?.Gf || 0}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div class="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full" style="width: ${Math.min(((topAssistman?.Gf || 0) / Math.max(topAssistman?.Pv || 1, 1)) * 100, 100)}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Barra Assist -->
+                        <div class="bg-gray-800 rounded p-2 mb-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-gray-300">Assist</span>
+                                <span class="text-xs font-bold text-blue-400">${topAssistman?.Ass || 0}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div class="bg-gradient-to-r from-blue-500 to-blue-400 h-2 rounded-full" style="width: ${Math.min(((topAssistman?.Ass || 0) / Math.max(topAssistman?.Pv || 1, 1)) * 100, 100)}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Barra Goal Contribution -->
+                        <div class="bg-gray-800 rounded p-2">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs text-gray-300">Goal Contribution</span>
+                                <span class="text-xs font-bold text-purple-400">${(topAssistman?.Gf || 0) + (topAssistman?.Ass || 0)} (${topAssistman?.Gf || 0}G + ${topAssistman?.Ass || 0}A) - ${(topAssistman?.Gf || 0) + (topAssistman?.Ass || 0)}/${topAssistman?.Pv || 0}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div class="bg-gradient-to-r from-purple-500 to-purple-400 h-2 rounded-full" style="width: ${Math.min((((topAssistman?.Gf || 0) + (topAssistman?.Ass || 0)) / Math.max(topAssistman?.Pv || 1, 1)) * 100, 100)}%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

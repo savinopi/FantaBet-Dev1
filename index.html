@@ -1090,5 +1090,27 @@
         window.executeConfirm = executeConfirm;
     </script>
 
+    <!-- Footer versione -->
+    <footer class="bg-gray-900 border-t border-gray-800 py-4 mt-8">
+        <div class="text-center text-gray-500 text-sm">
+            <p>FantaBet v3.1</p>
+            <p class="text-xs text-gray-600" id="update-timestamp"></p>
+        </div>
+    </footer>
+
+    <script>
+        // Imposta il timestamp dell'ultimo aggiornamento
+        const now = new Date();
+        const timestamp = now.toLocaleString('it-IT', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        document.getElementById('update-timestamp').textContent = `Ultimo aggiornamento: ${timestamp}`;
+    </script>
+
 </body>
 </html>
