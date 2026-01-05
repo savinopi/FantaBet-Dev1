@@ -1,6 +1,27 @@
 # FANTABet - Struttura Progetto
 
-**Versione: 3.1**
+**Versione: 3.2**
+
+## 🆕 Changelog v3.2
+
+### Ristrutturazione Sezione "Dati Lega"
+- **Nuova navigazione a sottosezioni** con header dinamico e freccia indietro
+- **5 sottosezioni dedicate**:
+  - 📅 **Risultati Storici** - Consulta risultati passati con filtro per giornata
+  - 👥 **Rose** - Visualizza le rose delle squadre con filtro
+  - 📊 **Statistiche Calciatori** - Analizza prestazioni con filtri e ordinamento
+  - 📈 **Statistiche Lega** - Statistiche generali della lega
+  - 📉 **Andamento Classifica** - Grafico evoluzione posizioni
+- **Caricamento asincrono** dei dati da Firebase
+- **Download Regolamento PDF** sempre accessibile dal menu principale
+
+### Miglioramenti Tecnici
+- Esportate funzioni getter su `window` per accesso dai moduli inline
+- Aggiunto `window.standingsTrendChartInstance` per il grafico andamento
+- Nuove funzioni: `switchLeagueDataView()`, `goBackToLeagueMenu()`
+- Supporto sia per dati locali che caricati da Firebase
+
+---
 
 ## 📁 Struttura delle Cartelle
 
