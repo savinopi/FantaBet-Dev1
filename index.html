@@ -440,8 +440,8 @@
                         <h1 class="text-2xl sm:text-3xl font-bold text-blue-400">Settings</h1>
                     </div>
                     
-                    <!-- Tab Navigation Admin (solo desktop) -->
-                    <div id="admin-tabs-nav" class="hidden lg:flex flex-wrap gap-2 mb-6 border-b border-gray-700 pb-3">
+                    <!-- Tab Navigation Admin (solo desktop, solo admin) -->
+                    <div id="admin-tabs-nav" class="admin-only admin-hidden lg:flex flex-wrap gap-2 mb-6 border-b border-gray-700 pb-3">
                         <button onclick="switchAdminTab('users')" id="admin-nav-users" class="admin-nav-tab px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-blue-500 text-blue-400 bg-gray-800/50">
                             <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
@@ -471,8 +471,8 @@
                     <div class="card p-4 sm:p-6">
                     <!-- Contenuto Tab Admin -->
                     <div id="admin-content">
-                        <!-- Tab Utenti -->
-                        <div id="admin-tab-users-content" class="admin-tab-content">
+                        <!-- Tab Utenti (solo admin) -->
+                        <div id="admin-tab-users-content" class="admin-tab-content admin-only admin-hidden">
                             <h3 class="text-lg font-bold text-blue-400 mb-4">Gestione Utenti</h3>
                             <div id="admin-users-list" class="space-y-3">
                                 <p class="text-gray-500">Caricamento utenti...</p>
@@ -480,7 +480,7 @@
                         </div>
                         
                         <!-- Tab Orari Giornate (solo desktop) -->
-                        <div id="admin-tab-schedules-content" class="admin-tab-content admin-desktop-only hidden">
+                        <div id="admin-tab-schedules-content" class="admin-tab-content admin-only admin-desktop-only hidden">
                             <h3 class="text-lg font-bold text-blue-400 mb-4">Orari Giornate</h3>
                             <div class="overflow-x-auto">
                                 <table class="min-w-full text-sm">
@@ -505,7 +505,7 @@
                         </div>
                         
                         <!-- Tab Scommesse (solo desktop) -->
-                        <div id="admin-tab-bets-content" class="admin-tab-content admin-desktop-only hidden">
+                        <div id="admin-tab-bets-content" class="admin-tab-content admin-only admin-desktop-only hidden">
                             <h3 class="text-lg font-bold text-blue-400 mb-4">Gestione Scommesse</h3>
                             <div class="flex gap-2 mb-4">
                                 <button id="filter-all" onclick="renderAdminBetsFilter('all')" class="btn-secondary px-3 py-1 text-sm">Tutte</button>
@@ -518,7 +518,7 @@
                         </div>
                         
                         <!-- Tab Gestione Dati (solo desktop) -->
-                        <div id="admin-tab-data-content" class="admin-tab-content admin-desktop-only hidden">
+                        <div id="admin-tab-data-content" class="admin-tab-content admin-only admin-desktop-only hidden">
                             <h3 class="text-xl font-bold mb-4 text-yellow-400">Caricamento Dati CSV</h3>
                             <div class="flex flex-wrap items-center gap-4 mb-4">
                                 <label for="csv-file-input" class="sr-only">Seleziona file CSV</label>
@@ -1461,6 +1461,18 @@
                 navBtn.classList.remove('border-transparent', 'text-gray-400');
                 navBtn.classList.add('border-blue-500', 'text-blue-400', 'bg-gray-800/50');
             }
+            
+            // Carica i dati per il tab selezionato
+            if (tab === 'users' && window.loadUsersForAdmin) {
+                console.log('📌 Tab Utenti cliccato - Caricando utenti...');
+                window.loadUsersForAdmin();
+            } else if (tab === 'schedules' && window.loadSchedulesForAdmin) {
+                console.log('📌 Tab Orari cliccato - Caricando orari...');
+                window.loadSchedulesForAdmin();
+            } else if (tab === 'bets' && window.renderAdminBetsFilter) {
+                console.log('📌 Tab Scommesse cliccato - Caricando scommesse...');
+                window.renderAdminBetsFilter('all');
+            }
         }
         
         // Esponi globalmente per l'uso dai moduli
@@ -1565,6 +1577,11 @@
                     document.getElementById('nav-tab-settings').classList.add('active');
                     document.getElementById('sidebar-tab-settings')?.classList.add('active');
                     updateTopNavTitle('Settings');
+                    // Carica gli utenti subito quando apri Settings
+                    if (window.loadUsersForAdmin) {
+                        console.log('⚙️ Settings tab aperto - Caricando utenti...');
+                        window.loadUsersForAdmin();
+                    }
                     break;
             }
             
@@ -2864,23 +2881,46 @@
     <!-- Footer versione -->
     <footer class="bg-gray-900 border-t border-gray-800 py-4 mt-8">
         <div class="text-center text-gray-500 text-sm">
-            <p>FantaBet v3.6</p>
+            <p>FantaBet v3.7</p>
             <p class="text-xs text-gray-600" id="update-timestamp"></p>
         </div>
     </footer>
 
     <script>
-        // Imposta il timestamp dell'ultimo aggiornamento
-        const now = new Date();
-        const timestamp = now.toLocaleString('it-IT', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-        document.getElementById('update-timestamp').textContent = `Ultimo aggiornamento: ${timestamp}`;
+        // Carica l'ultimo commit da GitHub
+        async function loadLastCommit() {
+            try {
+                const response = await fetch('https://api.github.com/repos/savinopi/FantaBet2/commits?per_page=1');
+                if (!response.ok) throw new Error('Failed to fetch');
+                
+                const commits = await response.json();
+                if (commits.length === 0) throw new Error('No commits found');
+                
+                const lastCommit = commits[0];
+                const commitDate = new Date(lastCommit.commit.author.date);
+                
+                const dateString = commitDate.toLocaleString('it-IT', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                document.getElementById('update-timestamp').textContent = `Ultimo commit: ${dateString}`;
+                console.log('✅ Ultimo commit caricato:', dateString);
+            } catch (error) {
+                console.error('Errore caricamento commit GitHub:', error);
+                document.getElementById('update-timestamp').textContent = 'Versione non disponibile';
+            }
+        }
+        
+        // Carica al load della pagina
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadLastCommit);
+        } else {
+            loadLastCommit();
+        }
     </script>
 
 </body>

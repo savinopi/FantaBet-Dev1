@@ -229,9 +229,9 @@ const updateAdminUI = (isAdmin) => {
     const adminElements = document.querySelectorAll('.admin-only');
     adminElements.forEach(el => {
         if (isAdmin) {
-            el.classList.remove('hidden');
+            el.classList.remove('admin-hidden');
         } else {
-            el.classList.add('hidden');
+            el.classList.add('admin-hidden');
         }
     });
 };

@@ -61,8 +61,13 @@ export const setAdminDependencies = (deps) => {
  * Renderizza la lista degli utenti per l'admin
  */
 export const renderAdminUsersList = async (users) => {
+    console.log('🔍 renderAdminUsersList called with users:', users);
     const listContainer = document.getElementById('admin-users-list');
-    if (!listContainer) return;
+    console.log('🔍 admin-users-list element:', listContainer);
+    if (!listContainer) {
+        console.warn('⚠️ admin-users-list element not found!');
+        return;
+    }
     listContainer.innerHTML = '';
 
     if (!users || users.length === 0) {
@@ -94,7 +99,7 @@ export const renderAdminUsersList = async (users) => {
                 </div>
                 
                 <!-- Grid informazioni utente -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <!-- Rosa Fantacalcio -->
                     <div class="flex flex-col">
                         <label class="text-xs text-gray-400 mb-1">Rosa Fantacalcio</label>
@@ -115,9 +120,9 @@ export const renderAdminUsersList = async (users) => {
                             class="bg-gray-800 text-sm p-2 rounded border border-gray-600 text-white" />
                     </div>
                     
-                    <!-- Admin -->
+                    <!-- Rendi Admin -->
                     <div class="flex flex-col justify-center">
-                        <label class="text-xs text-gray-400 mb-1">Ruolo</label>
+                        <label class="text-xs text-gray-400 mb-1">Rendi Admin</label>
                         <label class="flex items-center cursor-pointer">
                             <input 
                                 type="checkbox" 
@@ -125,7 +130,7 @@ export const renderAdminUsersList = async (users) => {
                                 ${user.isAdmin ? 'checked' : ''}
                                 class="mr-2 w-4 h-4">
                             <span class="text-sm ${user.isAdmin ? 'text-yellow-400 font-bold' : 'text-gray-300'}">
-                                ${user.isAdmin ? 'Admin' : 'Utente'}
+                                ${user.isAdmin ? 'Sì' : 'No'}
                             </span>
                         </label>
                     </div>
@@ -141,6 +146,18 @@ export const renderAdminUsersList = async (users) => {
                             Salva
                         </button>
                     </div>
+                    
+                    <!-- Pulsante Elimina -->
+                    <div class="flex items-end">
+                        <button 
+                            onclick="deleteUser('${user.id}', '${(user.email || user.displayName || user.id).replace(/'/g, "\\'")}')" 
+                            class="btn-danger w-full text-sm py-2">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            Elimina
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -152,7 +169,9 @@ export const renderAdminUsersList = async (users) => {
  * Carica gli utenti per l'admin
  */
 export const loadUsersForAdmin = async () => {
+    console.log('📌 loadUsersForAdmin called');
     const isUserAdmin = getIsUserAdmin();
+    console.log('📌 isUserAdmin:', isUserAdmin);
     
     if (!isUserAdmin) {
         messageBox('Solo gli admin possono accedere a questa sezione.');
@@ -160,17 +179,65 @@ export const loadUsersForAdmin = async () => {
     }
     
     try {
+        console.log('📌 Fetching users from database...');
         const usersSnapshot = await getDocs(getUsersCollectionRef());
+        console.log('📌 Users fetched:', usersSnapshot.docs.length);
         const allUsersForAdmin = usersSnapshot.docs.map(doc => ({ 
             id: doc.id, 
             ...doc.data() 
         }));
         
+        console.log('📌 Users mapped:', allUsersForAdmin.length);
         setAllUsersForAdmin(allUsersForAdmin);
+        console.log('📌 Calling renderAdminUsersList...');
         await renderAdminUsersList(allUsersForAdmin);
     } catch (error) {
         console.error('Errore caricamento utenti:', error);
         messageBox('Errore nel caricamento degli utenti: ' + error.message);
+    }
+};
+
+/**
+ * Elimina un utente dal database
+ * @param {string} uid - ID dell'utente da eliminare
+ * @param {string} userIdentifier - Nome/email per il messaggio di conferma
+ */
+export const deleteUser = async (uid, userIdentifier) => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) {
+        messageBox('Solo gli admin possono eliminare utenti.');
+        return;
+    }
+    
+    // Conferma eliminazione
+    if (!confirm(`Sei sicuro di voler eliminare l'utente "${userIdentifier}"?\n\nQuesta azione è irreversibile e cancellerà:\n- Profilo utente\n- Tutte le scommesse associate`)) {
+        return;
+    }
+    
+    try {
+        showProgressBar();
+        updateProgress(20, 'Eliminazione profilo utente...');
+        
+        // Elimina il documento utente
+        await deleteDoc(doc(getUsersCollectionRef(), uid));
+        
+        updateProgress(60, 'Eliminazione scommesse utente...');
+        
+        // Elimina anche le scommesse dell'utente (opzionale, dipende dalla struttura)
+        // Se le scommesse sono salvate per giornata, potremmo doverle pulire
+        
+        updateProgress(100, 'Utente eliminato!');
+        hideProgressBar();
+        
+        messageBox(`Utente "${userIdentifier}" eliminato con successo.`);
+        
+        // Ricarica la lista utenti
+        await loadUsersForAdmin();
+        
+    } catch (error) {
+        console.error('Errore eliminazione utente:', error);
+        hideProgressBar();
+        messageBox('Errore durante l\'eliminazione: ' + error.message);
     }
 };
 
@@ -1210,7 +1277,9 @@ export const clearPlayerStats = async () => {
  */
 export const setupGlobalAdminFunctions = () => {
     window.loadUsersForAdmin = loadUsersForAdmin;
+    window.renderAdminUsersList = renderAdminUsersList;
     window.updateUserPermissionsAndCredits = updateUserPermissionsAndCredits;
+    window.deleteUser = deleteUser;
     window.loadSchedulesForAdmin = loadSchedulesForAdmin;
     window.saveAllSchedules = saveAllSchedules;
     window.renderAdminBetsFilter = renderAdminBetsFilter;

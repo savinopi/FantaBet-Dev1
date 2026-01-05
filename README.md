@@ -1,8 +1,27 @@
 # FANTABet - Struttura Progetto
 
-**Versione: 3.6**
+**Versione: 3.7**
 
-## 🆕 Changelog v3.6
+## 🆕 Changelog v3.7
+
+### Admin User Management
+- **Delete User Button**: Aggiunto pulsante "Elimina" per rimuovere utenti dal database (admin only)
+- **Rendi Admin Label**: Rinominato da "Ruolo" a "Rendi Admin" con visualizzazione Sì/No
+- **Responsive Grid Layout**: Grid a 2 colonne su mobile, 3 su tablet, 5 su desktop per visibility ottimale
+- **Auto-load Users**: Caricamento automatico della lista utenti all'apertura della sezione Settings
+
+### Mobile Admin UI
+- **Desktop-only Tabs Hidden**: Tab "Orari", "Scommesse", "Dati CSV" nascosti su mobile (<1024px)
+- **Gestione Utenti sempre visibile**: Tab utenti visibile su tutte le piattaforme
+- **Improved Responsive Design**: Layout ottimizzato per mobile, tablet e desktop
+
+### Footer Enhancement
+- **GitHub Commit Info**: Footer mostra data e ora dell'ultimo commit su GitHub
+- **Real-time Version**: Versione aggiornata automaticamente dal repository
+
+---
+
+## 📜 Changelog v3.6
 
 ### Sezione Profilo
 - **Pulsante Logout**: Aggiunto pulsante rosso per disconnettersi dall'account

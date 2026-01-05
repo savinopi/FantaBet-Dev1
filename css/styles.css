@@ -22,6 +22,24 @@
     background-color: rgb(55, 65, 81);
 }
 
+/* Elementi visibili solo per admin */
+.admin-only.admin-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Nascondi i tab nav admin su mobile (solo desktop) */
+#admin-tabs-nav {
+    display: none !important;
+}
+
+@media (min-width: 1024px) {
+    #admin-tabs-nav {
+        display: flex !important;
+    }
+}
+
 /* Sottosezioni Admin visibili solo su desktop */
 .admin-desktop-only {
     display: none !important;
