@@ -12,7 +12,6 @@ import { getTeamLogo } from './config.js';
  */
 export const loadLeagueStatsData = () => {
     try {
-        console.log('[LoadLeagueStatsData] Avvio caricamento statistiche lega...');
         renderStatistics();
         
         // Carica leaderboards se la funzione è disponibile
@@ -31,7 +30,6 @@ export const loadLeagueStatsData = () => {
  * Inizializza le statistiche della lega (chiamato quando si entra nella vista)
  */
 export const initLeagueStats = () => {
-    console.log('[InitLeagueStats] Inizializzazione statistiche lega');
     loadLeagueStatsData();
 };
 
@@ -255,8 +253,6 @@ const renderStatistics = () => {
         console.error('[RenderStatistics] Container non trovato');
         return;
     }
-    
-    console.log('[RenderStatistics] Rendering statistiche lega...');
     
     if (!allResults || allResults.length === 0) {
         container.innerHTML = '<p class="text-gray-500 text-center py-4 col-span-full">Nessun dato disponibile</p>';
@@ -504,7 +500,6 @@ const renderStatistics = () => {
         </div>
     `;
     
-    console.log('[RenderStatistics] Rendering completato');
 };
 
 /**

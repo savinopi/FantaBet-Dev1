@@ -186,7 +186,6 @@ export const checkAdminStatus = async () => {
     // Prima controlla se è nella lista admin hardcoded
     if (ADMIN_USER_IDS.includes(userId)) {
         isUserAdmin = true;
-        console.log('[DEBUG ADMIN] User is in hardcoded admin list:', userId);
         updateAdminUI(true);
         updateUserInfoDisplay();
         return;
@@ -198,19 +197,15 @@ export const checkAdminStatus = async () => {
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
             const userData = userDoc.data();
-            console.log('[DEBUG ADMIN] User doc data:', userData);
             if (userData.isAdmin) {
                 isUserAdmin = true;
-                console.log('[DEBUG ADMIN] User is admin in database');
                 updateAdminUI(true);
             } else {
                 isUserAdmin = false;
-                console.log('[DEBUG ADMIN] User is NOT admin in database');
                 updateAdminUI(false);
             }
         } else {
             isUserAdmin = false;
-            console.log('[DEBUG ADMIN] User doc does not exist');
             updateAdminUI(false);
         }
         updateUserInfoDisplay();
@@ -250,31 +245,25 @@ export const updateUserInfoDisplay = () => {
     const userRoleElement = document.getElementById('user-role-display');
     const authStatusElement = document.getElementById('auth-status');
 
-    console.log('[DEBUG PROFILE] Updating display - Profile:', currentUserProfile, 'isAdmin:', isUserAdmin, 'userId:', userId);
-
     // Nome profilo (input editabile)
     if (userDisplayNameElement && currentUserProfile) { 
         const displayText = currentUserProfile.displayName || currentUserProfile.email || 'Utente';
         userDisplayNameElement.value = displayText;
-        console.log('[DEBUG PROFILE] Display name set to:', displayText);
     }
 
     // Email (readonly)
     if (profileEmailElement && currentUserProfile) {
         profileEmailElement.value = currentUserProfile.email || '';
-        console.log('[DEBUG PROFILE] Email set to:', currentUserProfile.email);
     }
 
     // ID Utente (readonly)
     if (userIdElement && userId) {
         userIdElement.value = userId;
-        console.log('[DEBUG PROFILE] ID set to:', userId);
     }
 
     // Ruolo (readonly)
     if (userRoleElement) {
         userRoleElement.value = isUserAdmin ? 'Admin' : 'Utente';
-        console.log('[DEBUG PROFILE] Role set to:', isUserAdmin ? 'Admin' : 'Utente');
     }
 
     // Stato autenticazione

@@ -512,18 +512,12 @@ export const renderAdminBetsList = (bets, users, filter = 'pending') => {
         return acc;
     }, {});
 
-    console.log('Scommesse raggruppate per giornata:', betsByGiornata);
-
     const userMap = (users || []).reduce((m, u) => { 
         m[u.uid || u.id] = u.displayName || u.email || u.id; 
         return m; 
     }, {});
     
-    console.log('Mappa utenti:', userMap);
-
     const sortedGiornate = Object.keys(betsByGiornata).sort((a,b) => parseInt(a,10) - parseInt(b,10));
-
-    console.log('Rendering giornate:', sortedGiornate);
 
     sortedGiornate.forEach(g => {
         const header = document.createElement('h4');
@@ -533,17 +527,8 @@ export const renderAdminBetsList = (bets, users, filter = 'pending') => {
 
         const betsInG = betsByGiornata[g];
         
-        console.log(`Rendering ${betsInG.length} scommesse per Giornata ${g}:`, betsInG);
-        
         betsInG.forEach(bet => {
             const userName = userMap[bet.userId] || bet.userId;
-            console.log('Rendering scommessa:', {
-                giornata: g,
-                utente: userName,
-                stake: bet.stake,
-                predictions: bet.predictions?.length,
-                settled: bet.settled
-            });
             
             const userCard = document.createElement('div');
             userCard.className = `card p-4 mb-3 ${bet.settled ? (bet.isWinning ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500') : 'border-l-4 border-yellow-500'}`;

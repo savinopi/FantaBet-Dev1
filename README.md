@@ -1,8 +1,27 @@
 # FANTABet - Struttura Progetto
 
-**Versione: 3.7**
+**Versione: 3.8**
 
-## 🆕 Changelog v3.7
+## 🆕 Changelog v3.8
+
+### Sezione "I miei Bonus"
+- **Visualizzazione Classifica 2 Squadre**: Mini classifica nella sezione bonus che mostra i dati punti (PT) e punti fantacalcio (PTI) delle 2 squadre coinvolte nel bonus
+- **PTI Calculation Fix**: Corretto il calcolo dei Punti Fantacalcio che non venivano accumulati correttamente
+- **Bonus Standings Import**: Importazione diretta di `calculateStandings` da rendering.js per garantire coerenza dati tra home e bonus
+- **Back Navigation**: Aggiunto pulsante back con freccia blu < che torna alla vista precedente (home)
+
+### Sezione "Risultati Storici"
+- **Back Navigation Unified**: Implementato back button con freccia blu < coerente con sezione bonus
+- **Improved UI**: Titolo "Risultati Storici" in blu con layout header semplificato
+- **Navigation Logic**: Uso di `goBack()` per tornare alla vista precedente anziché hardcoded redirect a home
+
+### Bug Fixes
+- **Fantasy Points Accumulation**: Risolto bug dove valori 0 o stringhe vuote non venivano accumulate nella classifica
+- **Conditional Check Fix**: Migliorato il check `if (res.homePoints !== undefined && res.homePoints !== null && res.homePoints !== '')` per evitare esclusione di valori nulli
+
+---
+
+## 📜 Changelog v3.7
 
 ### Admin User Management
 - **Delete User Button**: Aggiunto pulsante "Elimina" per rimuovere utenti dal database (admin only)

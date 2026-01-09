@@ -18,11 +18,14 @@ import {
     onSnapshot,
     query,
     where,
+    limit,
     doc,
     getDoc,
     getDocs,
     setDoc,
     updateDoc,
+    addDoc,
+    deleteDoc,
     collection,
     getTeamsCollectionRef,
     getResultsCollectionRef,
@@ -156,7 +159,8 @@ import {
     triggerStatsFileInput,
     handleStatsFileSelect,
     confirmStatsUpload,
-    processStatsFile
+    processStatsFile,
+    setCsvUploadDependencies
 } from './csv-upload.js';
 
 import {
@@ -283,6 +287,204 @@ const updateHomeWelcome = (userProfile) => {
     }
 };
 
+/**
+ * Processa il contenuto di un file CSV Calendario
+ */
+const processCsvContent = async (csvContent) => {
+    try {
+        const lines = csvContent.trim().split('\n');
+        
+        if (lines.length < 2) {
+            messageBox('File CSV vuoto o non valido');
+            return;
+        }
+
+        const headers = lines[0].split(';').map(h => h.trim());
+        if (!headers.includes('Giornata')) {
+            messageBox('Formato CSV non riconosciuto. Assicurati che la prima colonna sia "Giornata"');
+            return;
+        }
+
+        showProgressBar();
+        
+        const teamNames = new Set();
+        const resultsBatch = []; // Partite giocate (chiuse)
+        const matchesBatch = [];  // Partite da aprire (score = '-')
+        let processed = 0;
+        let skipped = 0;
+        
+        // Processa ogni riga (saltando l'header)
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            try {
+                const values = line.split(';').map(v => v.trim());
+                
+                if (values.length < 6) continue;
+                
+                const giornata = values[0];
+                const homeTeam = values[1];
+                const homePoints = parseFloat(values[2]) || 0;
+                const awayPoints = parseFloat(values[3]) || 0;
+                const awayTeam = values[4];
+                const score = values[5];
+                
+                if (!giornata || !homeTeam || !awayTeam) continue;
+                
+                teamNames.add(homeTeam);
+                teamNames.add(awayTeam);
+                
+                if (score === '-') {
+                    // PARTITA DA APRIRE (prossimi match)
+                    matchesBatch.push({
+                        homeTeam,
+                        awayTeam,
+                        giornata,
+                        status: 'open',
+                        score: null,
+                        createdAt: new Date().toISOString()
+                    });
+                    skipped++;
+                } else if (score && score.includes('-')) {
+                    // PARTITA GIOCATA (risultato storico)
+                    const [homeGoals, awayGoals] = score.split('-').map(g => parseInt(g.trim(), 10));
+                    let result = null;
+                    
+                    if (homeGoals > awayGoals) result = '1';
+                    else if (homeGoals < awayGoals) result = '2';
+                    else result = 'X';
+                    
+                    resultsBatch.push({
+                        homeTeam,
+                        awayTeam,
+                        homePoints,
+                        awayPoints,
+                        result,
+                        score: score,
+                        giornata,
+                        status: 'closed',
+                        timestamp: new Date().toISOString()
+                    });
+                    processed++;
+                }
+                
+                updateProgressBar(Math.round((i / lines.length) * 100));
+                
+            } catch (error) {
+                console.error(`Errore riga ${i}:`, error);
+            }
+        }
+        
+        hideProgressBar();
+        
+        // 1. Salva le squadre
+        showProgressBar();
+        updateProgressBar(20, 'Salvataggio squadre...');
+        
+        for (const team of teamNames) {
+            if (team) {
+                const q = query(getTeamsCollectionRef(), where('name', '==', team), limit(1));
+                const existing = await getDocs(q);
+                if (existing.empty) {
+                    await addDoc(getTeamsCollectionRef(), {
+                        name: team,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+            }
+        }
+        
+        // 2. Salva i risultati (partite giocate)
+        updateProgressBar(40, 'Salvataggio risultati storici...');
+        
+        for (const res of resultsBatch) {
+            const q = query(
+                getResultsCollectionRef(),
+                where('homeTeam', '==', res.homeTeam),
+                where('awayTeam', '==', res.awayTeam),
+                where('giornata', '==', res.giornata),
+                limit(1)
+            );
+            const existing = await getDocs(q);
+            if (existing.empty) {
+                await addDoc(getResultsCollectionRef(), res);
+            }
+        }
+        
+        // 3. Salva le partite future (rimuovi quelle vecchie, carica le nuove)
+        updateProgressBar(60, 'Aggiornamento partite aperte...');
+        
+        // Rimuovi partite aperte vecchie
+        const matchesRef = getMatchesCollectionRef();
+        const oldMatches = await getDocs(query(matchesRef, where('status', '==', 'open')));
+        
+        for (const doc of oldMatches.docs) {
+            await deleteDoc(doc.ref);
+        }
+        
+        // Aggiungi nuove partite aperte
+        for (const match of matchesBatch) {
+            await addDoc(matchesRef, match);
+        }
+        
+        hideProgressBar();
+        
+        // Ricarica i dati
+        scheduleCache = null;
+        await loadAllSchedules();
+        
+        // Riepilogo
+        const allResults = state.getAllResults();
+        const completedGiornate = new Set();
+        allResults.forEach(result => {
+            if (result.giornata) {
+                const giornataNum = parseInt(result.giornata, 10);
+                if (giornataNum > 0) completedGiornate.add(giornataNum);
+            }
+        });
+        
+        const activeGiornata = await loadActiveGiornata();
+        const suspendedGiornate = [];
+        if (activeGiornata) {
+            for (let i = 1; i < activeGiornata; i++) {
+                if (!completedGiornate.has(i)) suspendedGiornate.push(i);
+            }
+        }
+        
+        const sortedCompleted = Array.from(completedGiornate).sort((a, b) => a - b);
+        let summaryText = `✅ Caricamento completato!\n\n`;
+        summaryText += `📊 RIEPILOGO GIORNATE\n`;
+        summaryText += `────────────────────────\n`;
+        summaryText += `✅ Giornate Salvate: ${sortedCompleted.length}\n`;
+        if (sortedCompleted.length > 0) {
+            summaryText += `   ${sortedCompleted.join(', ')}\n`;
+        }
+        summaryText += `\n⏱️ Giornata Attiva: ${activeGiornata || 'N/A'}\n`;
+        if (activeGiornata) {
+            summaryText += `   💡 Puoi modificarla dai Settings\n`;
+        }
+        
+        if (suspendedGiornate.length > 0) {
+            summaryText += `\n⏸️ Giornate Sospese: ${suspendedGiornate.length}\n`;
+            summaryText += `   ${suspendedGiornate.join(', ')}\n`;
+        }
+        
+        summaryText += `\n📥 STATS UPLOAD\n`;
+        summaryText += `────────────────────────\n`;
+        summaryText += `✓ Risultati caricati: ${processed}\n`;
+        summaryText += `⊘ Partite aperte: ${skipped}\n`;
+        summaryText += `📋 Squadre salvate: ${teamNames.size}\n`;
+        
+        messageBox(summaryText);
+        
+    } catch (error) {
+        hideProgressBar();
+        console.error('Errore durante l\'elaborazione del CSV:', error);
+        messageBox('Errore durante l\'elaborazione del file: ' + error.message);
+    }
+};
+
 const setupFirebase = async () => {
     if (firebaseInitialized) return;
     
@@ -323,6 +525,13 @@ const setupFirebase = async () => {
         // Setup dipendenze per draw.js
         setDrawDependencies({
             calculateStandings: calculateStandings
+        });
+        
+        // Setup dipendenze per csv-upload.js
+        setCsvUploadDependencies({
+            processCsvContent: processCsvContent,
+            renderHistoricResults: renderHistoricResults,
+            loadActiveGiornata: loadActiveGiornata
         });
         
         // Setup dipendenze per admin.js - sarà completato dopo che le funzioni sono definite
@@ -401,17 +610,12 @@ const setupUserProfileListener = async (uid) => {
             
             console.log('[DEBUG LISTENER] Creazione documento con:', defaultUserData);
             await setDoc(userDocRef, defaultUserData);
-            console.log('[DEBUG LISTENER] Documento creato con successo');
         }
         
         // STEP 3: ORA IMPOSTA IL LISTENER (il documento esiste con certezza)
         const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
-            console.log('[DEBUG LISTENER] Snapshot ricevuto! Exists:', snapshot.exists());
-            console.log('[DEBUG LISTENER] Snapshot data:', snapshot.data());
-            
             if (snapshot.exists()) {
                 const data = snapshot.data();
-                console.log('[DEBUG LISTENER] Dati profilo ricevuti:', data);
                 setCurrentUserProfile({ id: snapshot.id, ...data });
                 setUserCredits(data.credits || 100);
                 updateUserInfoDisplay();
@@ -730,9 +934,15 @@ const renderGiornateProgress = async () => {
         const allResults = state.getAllResults();
         const completedGiornate = new Set();
         
+        // Una giornata è completata solo se è MINORE della giornata attiva
+        // oppure se è la giornata attiva ma ha risultati finali
         allResults.forEach(result => {
             if (result.giornata) {
-                completedGiornate.add(parseInt(result.giornata, 10));
+                const giornataNum = parseInt(result.giornata, 10);
+                // Una giornata è completata solo se è passata (< activeGiornata)
+                if (activeGiornata && giornataNum < activeGiornata) {
+                    completedGiornate.add(giornataNum);
+                }
             }
         });
         
@@ -742,23 +952,28 @@ const renderGiornateProgress = async () => {
         // Renderizza le giornate
         let html = '';
         for (let i = 1; i <= totalGiornate; i++) {
-            let bgColor = 'bg-gray-700'; // Giornate non iniziate (grigio)
+            let bgColor = 'bg-gray-700'; // Giornate non iniziate (grigio) - DEFAULT
             let tooltip = `Giornata ${i}`;
             let icon = '';
             
-            if (completedGiornate.has(i)) {
-                bgColor = 'bg-green-500'; // Giornate chiuse (verde)
-                tooltip = `Giornata ${i} - Completata`;
-                icon = '<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>';
-            } else if (i === activeGiornata) {
-                bgColor = 'bg-yellow-500 ring-2 ring-yellow-300 animate-pulse'; // Giornata attiva (giallo con animazione)
+            // Logica di controllo ordinata per priorità
+            if (i === activeGiornata) {
+                // Giornata attiva (giallo con animazione) - PRIORITÀ 1
+                bgColor = 'bg-yellow-500 ring-2 ring-yellow-300 animate-pulse';
                 tooltip = `Giornata ${i} - In corso`;
                 icon = '<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>';
-            } else if (activeGiornata && i < activeGiornata && !completedGiornate.has(i)) {
-                bgColor = 'bg-red-500'; // Giornate sospese/saltate (rosso)
+            } else if (completedGiornate.has(i)) {
+                // Giornate completate (verde) - PRIORITÀ 2
+                bgColor = 'bg-green-500';
+                tooltip = `Giornata ${i} - Completata`;
+                icon = '<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>';
+            } else if (activeGiornata && i < activeGiornata) {
+                // Giornate passate ma non completate = sospese/saltate (rosso) - PRIORITÀ 3
+                bgColor = 'bg-red-500';
                 tooltip = `Giornata ${i} - Sospesa`;
                 icon = '<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>';
             }
+            // else: grigio (giornate non ancora iniziate) - rimane il DEFAULT
             
             html += `<div class="${bgColor} flex-1 min-w-0 h-full cursor-pointer hover:opacity-70 transition-all relative group" title="${tooltip}"></div>`;
         }
@@ -1192,6 +1407,181 @@ export const initializeApp = async () => {
             }
         }, 250); // Debounce 250ms
     });
+};
+
+// ===================================
+// FUNZIONI RESET DATI (ADMIN ONLY)
+// ===================================
+
+window.clearHistoricResults = async () => {
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTI i risultati storici? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar();
+    
+    try {
+        const snapshot = await getDocs(getResultsCollectionRef());
+        const totalDocs = snapshot.docs.length;
+        let deletedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(doc(getResultsCollectionRef(), docSnapshot.id));
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgressBar(progress, `Cancellazione in corso...`);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellati ${deletedCount} risultati storici.`);
+        console.log(`Cancellati ${deletedCount} risultati storici`);
+        
+        // Ricarica i dati
+        scheduleCache = null;
+        await loadAllSchedules();
+        
+    } catch (error) {
+        console.error("Errore cancellazione risultati storici:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+window.clearOpenMatches = async () => {
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler cancellare TUTTE le partite aperte? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar();
+    
+    try {
+        const q = query(getMatchesCollectionRef(), where('status', '==', 'open'));
+        const snapshot = await getDocs(q);
+        const totalDocs = snapshot.docs.length;
+        let deletedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(doc(getMatchesCollectionRef(), docSnapshot.id));
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgressBar(progress, `Cancellazione in corso...`);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellate ${deletedCount} partite aperte.`);
+        console.log(`Cancellate ${deletedCount} partite aperte`);
+        
+        // Ricarica i dati
+        scheduleCache = null;
+        await loadAllSchedules();
+        
+    } catch (error) {
+        console.error("Errore cancellazione partite aperte:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+window.resetUserCredits = async () => {
+    if (!isUserAdmin) return;
+    
+    if (!confirm('Sei sicuro di voler reimpostare i crediti di TUTTI gli utenti a 100? Questa azione è irreversibile.')) {
+        return;
+    }
+    
+    showProgressBar();
+    
+    try {
+        const snapshot = await getDocs(getUsersCollectionRef());
+        const totalDocs = snapshot.docs.length;
+        let updatedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await updateDoc(doc(getUsersCollectionRef(), docSnapshot.id), { credits: 100 });
+            updatedCount++;
+            
+            const progress = (updatedCount / totalDocs) * 100;
+            updateProgressBar(progress, `Reset in corso...`);
+        }
+        
+        hideProgressBar();
+        messageBox(`Crediti reimpostati per ${updatedCount} utenti.`);
+        console.log(`Crediti reimpostati per ${updatedCount} utenti`);
+        
+    } catch (error) {
+        console.error("Errore reset crediti:", error);
+        hideProgressBar();
+        messageBox(`Errore durante il reset: ${error.message}`);
+    }
+};
+
+window.clearHistoricResultsAndTeams = async (confirmed) => {
+    if (!isUserAdmin) return;
+    
+    if (!confirmed) {
+        messageBox('⚠️ RESET TOTALE DATABASE\n\nCancella TUTTO: squadre, partite, risultati storici.\nQuesta azione è IRREVERSIBILE!\n\nSei davvero sicuro?', true);
+        return;
+    }
+    
+    showProgressBar();
+
+    const collectionsToClear = [
+        getTeamsCollectionRef(), 
+        getResultsCollectionRef(), 
+        getMatchesCollectionRef()
+    ];
+    
+    let totalDeleted = 0;
+    let totalDocs = 0;
+
+    try {
+        // Prima conta tutti i documenti
+        const snapshots = await Promise.all(collectionsToClear.map(ref => getDocs(ref)));
+        totalDocs = snapshots.reduce((sum, snapshot) => sum + snapshot.docs.length, 0);
+        
+        updateProgressBar(10, 'Inizio cancellazione...');
+        
+        let currentIndex = 0;
+        for (let i = 0; i < collectionsToClear.length; i++) {
+            const collectionRef = collectionsToClear[i];
+            const snapshot = snapshots[i];
+            let collectionDeleted = 0;
+            
+            // Cancella ogni documento uno per uno
+            for (const docSnapshot of snapshot.docs) {
+                await deleteDoc(doc(collectionRef, docSnapshot.id));
+                collectionDeleted++;
+                totalDeleted++;
+                currentIndex++;
+                
+                const progress = 10 + (currentIndex / totalDocs) * 85;
+                updateProgressBar(progress, `Cancellazione ${collectionRef.id}...`);
+            }
+            console.log(`Cancellati ${collectionDeleted} documenti dalla collezione: ${collectionRef.id}`);
+        }
+        
+        updateProgressBar(100, 'Completato!');
+        
+        setTimeout(() => {
+            hideProgressBar();
+            messageBox(`Cancellazione completa! Eliminati ${totalDeleted} documenti totali. L'app è stata resettata.`);
+            
+            // Ricarica i dati
+            scheduleCache = null;
+            loadAllSchedules();
+        }, 500);
+        
+    } catch (error) {
+        console.error("Errore durante la cancellazione dei dati:", error);
+        hideProgressBar();
+        messageBox(`Errore grave durante la cancellazione. Controlla i permessi di scrittura/cancellazione su Firebase. Errore: ${error.message}`);
+    }
 };
 
 // Fallback per caricamento diretto

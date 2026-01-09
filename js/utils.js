@@ -68,8 +68,42 @@ export const showProgressBar = (title = 'Elaborazione in corso...') => {
  * Aggiorna la barra di progresso
  * @param {number} percentage - Percentuale completamento (0-100)
  * @param {string} status - Messaggio di stato
+ * @param {string} title - Titolo (non usato, per compatibilità)
+ * @param {*} extra - Extra (non usato, per compatibilità)
+ * @param {string} containerId - ID del contenitore della barra (default: 'progress-bar-container')
  */
-export const updateProgressBar = (percentage, status = '') => {
+export const updateProgressBar = (percentage, status = '', title = null, extra = null, containerId = 'progress-bar-container') => {
+    // Se è specificato un containerId diverso, usa quello
+    if (containerId === 'stats-progress') {
+        // Aggiorna la barra di progressione statistiche
+        const container = document.getElementById('stats-progress');
+        const fill = document.getElementById('stats-progress-bar-fill');
+        const percentageEl = document.getElementById('stats-progress-percentage');
+        const statusEl = document.getElementById('stats-progress-status');
+        
+        if (container && percentage > 0) {
+            container.classList.remove('hidden');
+        }
+        if (fill) {
+            fill.style.width = `${percentage}%`;
+        }
+        if (percentageEl) {
+            percentageEl.textContent = `${Math.round(percentage)}%`;
+        }
+        if (statusEl && status) {
+            statusEl.textContent = status;
+        }
+        if (percentage >= 100) {
+            setTimeout(() => {
+                if (container) {
+                    container.classList.add('hidden');
+                }
+            }, 2000);
+        }
+        return;
+    }
+    
+    // Barra di progresso principale
     const fill = document.getElementById('progress-bar-fill');
     const percentageEl = document.getElementById('progress-percentage');
     const statusEl = document.getElementById('progress-status');

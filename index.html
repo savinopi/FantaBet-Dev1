@@ -24,8 +24,18 @@
     <meta name="apple-mobile-web-app-title" content="FantaBet">
     <meta name="theme-color" content="#0a1628">
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS (con configurazione per produzione) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        if (typeof tailwind !== 'undefined') {
+            tailwind.config = {
+                important: true,
+                corePlugins: {
+                    preflight: true,
+                }
+            };
+        }
+    </script>
     
     <!-- Chart.js per grafici -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -156,7 +166,7 @@
                     
                     <!-- Rose Squadre -->
                     <button onclick="closeDataAnalysisModal(); setAppView('squads')" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-6 text-left transition-all">
-                        <svg class="w-10 h-10 text-pink-400 mb-3" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-10 h-10 text-purple-400 mb-3" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
                         </svg>
                         <h3 class="text-lg font-bold text-white mb-1">Rose Squadre</h3>
@@ -485,6 +495,12 @@
                             </svg>
                             Dati CSV
                         </button>
+                        <button onclick="switchAdminTab('danger')" id="admin-nav-danger" class="admin-nav-tab px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500">
+                            <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                            Reset Dati
+                        </button>
                     </div>
                     
                     <div class="card p-4 sm:p-6">
@@ -656,6 +672,61 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- TAB RESET DATI -->
+                        <div id="admin-tab-danger-content" class="admin-tab-content admin-only admin-desktop-only hidden border-red-600">
+                            <h3 class="text-xl font-bold mb-6 text-red-400">Reset Dati</h3>
+                            
+                            <div class="space-y-6">
+                                <!-- Cancella Risultati Storici -->
+                                <div class="border border-gray-700 rounded-lg p-4">
+                                    <h4 class="font-semibold text-lg mb-2 text-red-300">Cancella Risultati Storici</h4>
+                                    <p class="text-sm text-gray-400 mb-3">Rimuove tutti i risultati storici caricati da CSV (giornate già completate).</p>
+                                    <button onclick="clearHistoricResults()" class="btn-danger">
+                                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                        Cancella Risultati Storici
+                                    </button>
+                                </div>
+
+                                <!-- Cancella Partite Aperte -->
+                                <div class="border border-gray-700 rounded-lg p-4">
+                                    <h4 class="font-semibold text-lg mb-2 text-red-300">Cancella Partite Aperte</h4>
+                                    <p class="text-sm text-gray-400 mb-3">Rimuove tutte le partite aperte (giornate future disponibili per le scommesse).</p>
+                                    <button onclick="clearOpenMatches()" class="btn-danger">
+                                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                        Cancella Partite Aperte
+                                    </button>
+                                </div>
+
+                                <!-- Reset Crediti Utenti -->
+                                <div class="border border-gray-700 rounded-lg p-4">
+                                    <h4 class="font-semibold text-lg mb-2 text-red-300">Reset Crediti Utenti</h4>
+                                    <p class="text-sm text-gray-400 mb-3">Reimposta i crediti di tutti gli utenti a 100 (valore predefinito).</p>
+                                    <button onclick="resetUserCredits()" class="btn-danger">
+                                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        Reset Crediti (100 per tutti)
+                                    </button>
+                                </div>
+
+                                <!-- Reset Totale -->
+                                <div class="border-2 border-red-500 rounded-lg p-4 bg-red-900 bg-opacity-10">
+                                    <h4 class="font-semibold text-lg mb-2 text-red-400">⚠️ RESET TOTALE</h4>
+                                    <p class="text-sm text-gray-300 mb-3 font-semibold">Cancella TUTTO: squadre, partite, risultati storici. Questa azione è IRREVERSIBILE!</p>
+                                    <button onclick="clearHistoricResultsAndTeams(false)" class="btn-danger">
+                                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                        </svg>
+                                        RESET COMPLETO
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     </div> <!-- fine card Settings -->
                 </div>
@@ -692,7 +763,7 @@
                         <!-- Rose -->
                         <button onclick="switchLeagueDataView('squads')" class="bg-cyan-600 hover:bg-cyan-700 text-white p-4 rounded-lg flex items-center gap-3 transition-colors">
                             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM9 6a9 9 0 11-18 0 9 9 0 0118 0zm-5 9a3 3 0 11-6 0 3 3 0 016 0zM16 7a2 2 0 11-4 0 2 2 0 014 0zm2 5a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
                             </svg>
                             <div class="text-left">
                                 <h4 class="font-bold">Rose</h4>
@@ -922,15 +993,18 @@
 
                 <!-- SEZIONE RISULTATI STORICI (Legacy - nascosto) -->
                 <div id="historic-results-container" class="max-w-6xl mx-auto card p-4 sm:p-6 hidden" style="margin-top: max(4rem, calc(var(--safe-area-inset-top) + 3rem));">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-3 sm:space-y-0">
-                        <h2 class="text-xl sm:text-2xl font-semibold">Risultati Storici</h2>
-                        <div class="flex gap-2">
-                            <select id="historic-giornata-filter-2" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white" onchange="filterHistoricResults()">
-                                <option value="all">Tutte le giornate</option>
-                            </select>
-                            <button onclick="showDataAnalysisMenu()" class="btn-secondary px-3 py-2">⬅ Indietro</button>
-                            <button onclick="setAppView('home')" class="btn-secondary px-3 py-2">Home</button>
-                        </div>
+                    <div class="flex items-center gap-4 mb-4 pb-4 border-b border-gray-700">
+                        <button onclick="goBack()" class="text-blue-400 hover:text-blue-300 transition-colors p-1 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </button>
+                        <h2 class="text-xl sm:text-2xl font-semibold text-blue-400">Risultati Storici</h2>
+                    </div>
+                    <div class="flex gap-2 mb-4">
+                        <select id="historic-giornata-filter-2" class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white" onchange="filterHistoricResults()">
+                            <option value="all">Tutte le giornate</option>
+                        </select>
                     </div>
                     <div id="historic-results-table-2" class="space-y-4"></div>
                 </div>
@@ -1076,15 +1150,13 @@
 
                 <!-- SEZIONE BONUS UTENTE -->
                 <div id="user-bonus-container" class="max-w-4xl mx-auto card p-4 sm:p-6 hidden" style="margin-top: max(0.5rem, var(--safe-area-inset-top));">
-                    <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-700">
-                        <button onclick="setAppView('home')" class="bg-orange-600 hover:bg-orange-700 text-white font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    <div class="flex items-center gap-4 mb-4 pb-4 border-b border-gray-700">
+                        <button onclick="goBack()" class="text-blue-400 hover:text-blue-300 transition-colors p-1 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                             </svg>
-                            Indietro
                         </button>
                         <h1 class="text-2xl sm:text-3xl font-bold text-blue-400">I miei Bonus</h1>
-                        <div class="w-20"></div>
                     </div>
                     
                     <!-- Countdown Bonus -->
@@ -1960,6 +2032,14 @@
                 });
             }
             
+            // Carica le statistiche dei giocatori
+            let playerStats = window.getPlayerStatsData ? window.getPlayerStatsData() : [];
+            const statsMap = new Map();
+            playerStats.forEach(stat => {
+                const normalizedName = (stat.playerName || '').trim().toLowerCase();
+                statsMap.set(normalizedName, stat);
+            });
+            
             // Renderizza le rose
             let html = '';
             const sortedSquads = Array.from(squadsData.entries()).sort((a, b) => a[0].localeCompare(b[0]));
@@ -1969,27 +2049,85 @@
             
             sortedSquads.forEach(([squadName, players]) => {
                 const playersByRole = { P: [], D: [], C: [], A: [] };
+                let totalCost = 0;
+                let totalFantaMedia = 0;
+                let countFantaMedia = 0;
+                let totalMediaVoto = 0;
+                let countMediaVoto = 0;
+                
                 players.forEach(p => {
                     const role = (p.role || p.ruolo || 'C').charAt(0).toUpperCase();
                     if (playersByRole[role]) playersByRole[role].push(p);
+                    
+                    // Calcola totali
+                    totalCost += p.cost || 0;
+                    
+                    // Aggiungi statistiche
+                    const normalizedName = (p.playerName || p.nome || '').trim().toLowerCase();
+                    const stat = statsMap.get(normalizedName);
+                    if (stat && stat.fm) {
+                        totalFantaMedia += stat.fm;
+                        countFantaMedia++;
+                    }
+                    if (stat && stat.mv) {
+                        totalMediaVoto += stat.mv;
+                        countMediaVoto++;
+                    }
                 });
                 
-                html += `<div class="bg-gray-800 rounded-lg p-4 mb-4" data-squad="${squadName}">
-                    <h3 class="text-lg font-bold text-cyan-400 mb-3 border-b border-gray-700 pb-2">${squadName}</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`;
+                const avgFantaMedia = countFantaMedia > 0 ? (totalFantaMedia / countFantaMedia).toFixed(2) : '-';
+                const avgMediaVoto = countMediaVoto > 0 ? (totalMediaVoto / countMediaVoto).toFixed(2) : '-';
+                
+                html += `<div class="bg-gray-900 border-2 border-purple-600 rounded-lg overflow-hidden mb-4" data-squad="${squadName}">
+                    <div class="bg-gradient-to-r from-purple-900 via-purple-800 to-purple-900 p-3 border-b-2 border-purple-600">
+                        <h3 class="text-lg font-bold text-cyan-400 mb-2">${squadName}</h3>
+                        <div class="flex gap-2 text-xs flex-wrap">
+                            <div class="bg-purple-700/50 px-2 py-1 rounded border border-purple-500">
+                                <span class="text-gray-300">👥</span>
+                                <span class="text-white font-bold ml-1">${players.length}</span>
+                            </div>
+                            <div class="bg-yellow-700/50 px-2 py-1 rounded border border-yellow-500">
+                                <span class="text-gray-300">💰</span>
+                                <span class="text-yellow-300 font-bold ml-1">${totalCost}</span>
+                            </div>
+                            <div class="bg-green-700/50 px-2 py-1 rounded border border-green-500">
+                                <span class="text-gray-300">⭐</span>
+                                <span class="text-green-300 font-bold ml-1">MV: ${avgMediaVoto}</span>
+                            </div>
+                            <div class="bg-blue-700/50 px-2 py-1 rounded border border-blue-500">
+                                <span class="text-gray-300">📊</span>
+                                <span class="text-blue-300 font-bold ml-1">FM: ${avgFantaMedia}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">`;
                 
                 ['P', 'D', 'C', 'A'].forEach(role => {
                     const rolePlayers = playersByRole[role];
                     if (rolePlayers.length > 0) {
-                        html += `<div class="bg-gray-700/50 rounded p-2">
+                        html += `<div class="bg-gray-800 rounded p-2">
                             <h4 class="text-sm font-semibold text-${roleColors[role]}-400 mb-2">${roleLabels[role]} (${rolePlayers.length})</h4>
                             <div class="space-y-1">`;
                         rolePlayers.forEach(p => {
                             const name = p.playerName || p.nome || 'Sconosciuto';
                             const team = p.serieATeam || p.squadra || '';
-                            html += `<div class="text-xs text-gray-300 flex justify-between">
-                                <span>${name}</span>
-                                <span class="text-gray-500">${team}</span>
+                            const cost = p.cost || 0;
+                            
+                            const normalizedName = (name || '').trim().toLowerCase();
+                            const stat = statsMap.get(normalizedName);
+                            const mv = stat && stat.mv !== undefined ? stat.mv.toFixed(2) : '-';
+                            const fm = stat && stat.fm !== undefined ? stat.fm.toFixed(1) : '-';
+                            
+                            html += `<div class="text-xs text-gray-300 flex justify-between gap-1 px-1 py-0.5 bg-gray-700/30 rounded">
+                                <div class="flex-1 min-w-0">
+                                    <div class="truncate font-semibold">${name}</div>
+                                    <div class="text-gray-500 text-xs">${team}</div>
+                                </div>
+                                <div class="text-right flex-shrink-0">
+                                    <div class="text-yellow-400">💰${cost}</div>
+                                    <div class="text-green-400">MV:${mv}</div>
+                                    <div class="text-blue-400">FM:${fm}</div>
+                                </div>
                             </div>`;
                         });
                         html += `</div></div>`;

@@ -289,8 +289,12 @@ export const calculateStandings = (results) => {
         }
         
         // Fantasy points (se presenti)
-        if (res.homePoints) home.fantasyPoints += parseFloat(res.homePoints) || 0;
-        if (res.awayPoints) away.fantasyPoints += parseFloat(res.awayPoints) || 0;
+        if (res.homePoints !== undefined && res.homePoints !== null && res.homePoints !== '') {
+            home.fantasyPoints += parseFloat(res.homePoints) || 0;
+        }
+        if (res.awayPoints !== undefined && res.awayPoints !== null && res.awayPoints !== '') {
+            away.fantasyPoints += parseFloat(res.awayPoints) || 0;
+        }
     });
     
     // Converti in array e ordina
@@ -402,18 +406,19 @@ const generateMobileStandingsHtml = (standings) => {
             posClass = 'text-orange-400 font-semibold';
         }
         
-        const fantasyPoints = team.fantasyPoints.toFixed(1);
+        const fantasyPoints = (team.fantasyPoints || 0).toFixed(1);
         const maxLength = getMaxTeamNameLength();
-        const squadraDisplay = team.team.length > maxLength ? team.team.substring(0, maxLength) + '...' : team.team;
+        const teamNameSafe = team.team || 'Unknown';
+        const squadraDisplay = teamNameSafe.length > maxLength ? teamNameSafe.substring(0, maxLength) + '...' : teamNameSafe;
         
         html += `
-            <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(55, 65, 81, 1); white-space: nowrap; overflow: hidden; cursor: pointer;" class="hover:bg-gray-800 transition" onclick="showTeamStats('${team.team.replace(/'/g, "\\'")}')">
+            <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(55, 65, 81, 1); white-space: nowrap; overflow: hidden; cursor: pointer;" class="hover:bg-gray-800 transition" onclick="showTeamStats('${teamNameSafe.replace(/'/g, "\\'")}')"> 
                 <div style="width: 30px; text-align: center; flex-shrink: 0;">
                     <span class="${posClass} text-lg font-bold">${pos}</span>
                 </div>
-                <img src="${getTeamLogo(team.team)}" alt="${team.team}" style="width: 24px; height: 24px; margin: 0 0.5rem 0 0.25rem; flex-shrink: 0; display: block;" onerror="this.style.display='none'">
+                <img src="${getTeamLogo(teamNameSafe)}" alt="${teamNameSafe}" style="width: 24px; height: 24px; margin: 0 0.5rem 0 0.25rem; flex-shrink: 0; display: block;" onerror="this.style.display='none'">
                 <div style="flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    <span class="text-white font-semibold text-sm" title="${team.team}" style="display: block;">${squadraDisplay}</span>
+                    <span class="text-white font-semibold text-sm" title="${teamNameSafe}" style="display: block;">${squadraDisplay}</span>
                 </div>
                 <span class="text-blue-400 font-bold text-sm" style="width: 35px; text-align: right; flex-shrink: 0; margin-left: 0.75rem;">${team.points}</span>
                 <span class="text-green-400 font-bold text-sm" style="width: 45px; text-align: right; flex-shrink: 0; margin-left: 0.5rem;">${fantasyPoints}</span>
@@ -491,15 +496,16 @@ const generateDesktopStandingsHtml = (standings) => {
         const goalDiffText = goalDiff > 0 ? `+${goalDiff}` : goalDiff.toString();
         const goalDiffClass = goalDiff > 0 ? 'text-green-400' : goalDiff < 0 ? 'text-red-400' : 'text-gray-400';
         
+        const teamName = team.team || 'Unknown';
         html += `
-            <tr class="hover:bg-gray-800/50 transition-colors cursor-pointer" onclick="showTeamStats('${team.team.replace(/'/g, "\\'")}')">
+            <tr class="hover:bg-gray-800/50 transition-colors cursor-pointer" onclick="showTeamStats('${teamName.replace(/'/g, "\\'")}')">
                 <td class="px-2 py-3 text-center ${posClass} font-bold">${pos}</td>
                 <td class="px-2 py-3 text-center">
-                    <img src="${getTeamLogo(team.team)}" alt="${team.team}" class="w-7 h-7 object-contain mx-auto" onerror="this.style.display='none'">
+                    <img src="${getTeamLogo(team.team)}" alt="${team.team || 'Unknown'}" class="w-7 h-7 object-contain mx-auto" onerror="this.style.display='none'">
                 </td>
-                <td class="px-2 py-3 text-left font-semibold text-white">${team.team}</td>
+                <td class="px-2 py-3 text-left font-semibold text-white">${team.team || 'Unknown'}</td>
                 <td class="px-2 py-3 text-center font-bold text-blue-400">${team.points}</td>
-                <td class="px-2 py-3 text-center font-semibold text-green-400">${team.fantasyPoints.toFixed(1)}</td>
+                <td class="px-2 py-3 text-center font-semibold text-green-400">${(team.fantasyPoints || 0).toFixed(1)}</td>
                 <td class="px-2 py-3 text-center">${team.played}</td>
                 <td class="px-2 py-3 text-center text-green-400">${team.wins}</td>
                 <td class="px-2 py-3 text-center text-yellow-400">${team.draws}</td>
@@ -571,13 +577,13 @@ const generateFullStandingsHtml = (standings) => {
             <tr class="hover:bg-gray-700/50 transition-colors">
                 <td class="px-2 md:px-3 py-3 text-center ${posClass}">${pos}</td>
                 <td class="px-1 md:px-2 py-3 text-center">
-                    <img src="${getTeamLogo(team.team)}" alt="${team.team}" 
+                    <img src="${getTeamLogo(team.team)}" alt="${team.team || 'Unknown'}" 
                          class="w-6 h-6 md:w-8 md:h-8 object-contain mx-auto" 
                          onerror="this.style.display='none'">
                 </td>
-                <td class="px-2 md:px-3 py-3 font-semibold text-white whitespace-normal">${team.team}</td>
+                <td class="px-2 md:px-3 py-3 font-semibold text-white whitespace-normal">${team.team || 'Unknown'}</td>
                 <td class="px-1 md:px-2 py-3 text-center font-bold text-blue-400">${team.points}</td>
-                <td class="px-1 md:px-2 py-3 text-center text-green-400">${team.fantasyPoints.toFixed(1)}</td>
+                <td class="px-1 md:px-2 py-3 text-center text-green-400">${(team.fantasyPoints || 0).toFixed(1)}</td>
                 <td class="px-1 md:px-2 py-3 text-center">${team.played}</td>
                 <td class="px-1 md:px-2 py-3 text-center text-green-400">${team.wins}</td>
                 <td class="px-1 md:px-2 py-3 text-center text-yellow-400">${team.draws}</td>
@@ -781,13 +787,13 @@ const calculateStandingsTrend = () => {
     
     // Raccogli tutte le squadre
     allResults.forEach(r => {
-        allTeamsSet.add(r.homeTeam);
-        allTeamsSet.add(r.awayTeam);
+        if (r.homeTeam) allTeamsSet.add(r.homeTeam);
+        if (r.awayTeam) allTeamsSet.add(r.awayTeam);
     });
     
     // Inizializza le squadre
     allTeamsSet.forEach(team => {
-        teamTrends.set(team, []);
+        if (team) teamTrends.set(team, []);
     });
     
     // Per ogni giornata, calcola la classifica cumulativa
@@ -860,11 +866,14 @@ const calculateStandingsTrend = () => {
         
         // Salva la posizione di ogni squadra in questa giornata
         standings.forEach((team, index) => {
-            teamTrends.get(team.team).push({
-                giornata: giornata,
-                position: index + 1,
-                points: team.points
-            });
+            const teamName = team.team || 'Unknown';
+            if (teamTrends.has(teamName)) {
+                teamTrends.get(teamName).push({
+                    giornata: giornata,
+                    position: index + 1,
+                    points: team.points
+                });
+            }
         });
     });
     
@@ -918,6 +927,7 @@ export const renderStandingsTrend = () => {
     
     // Ordina le squadre per posizione finale
     const finalStandings = Array.from(teamTrends.entries())
+        .filter(([team, trend]) => trend && trend.length > 0)
         .map(([team, trend]) => ({
             team: team,
             finalPosition: trend[trend.length - 1].position,

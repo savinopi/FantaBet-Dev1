@@ -16,6 +16,7 @@ import { messageBox, showProgressBar, hideProgressBar, updateProgressBar, update
 import { getTeamLogo } from './config.js';
 import { getIsUserAdmin, getCurrentUserProfile } from './auth.js';
 import { getAllMatches, getAllResults } from './state.js';
+import { calculateStandings } from './rendering.js';
 
 // Dati correnti dei bonus
 let currentBonusData = [];
@@ -27,7 +28,6 @@ let bonusCountdownInterval = null;
 let loadActiveGiornata = null;
 let getGiornataDeadline = null;
 let isActiveGiornata = null;
-let calculateStandings = null;
 
 /**
  * Imposta le dipendenze esterne
@@ -36,7 +36,6 @@ export const setBonusDependencies = (deps) => {
     if (deps.loadActiveGiornata) loadActiveGiornata = deps.loadActiveGiornata;
     if (deps.getGiornataDeadline) getGiornataDeadline = deps.getGiornataDeadline;
     if (deps.isActiveGiornata) isActiveGiornata = deps.isActiveGiornata;
-    if (deps.calculateStandings) calculateStandings = deps.calculateStandings;
 };
 
 // ==================== ADMIN BONUS MANAGEMENT ====================
@@ -555,8 +554,9 @@ const renderUserBonusCard = async () => {
                (m.homeTeam === userSquad || m.awayTeam === userSquad);
     });
 
-    // Calcola la classifica
-    const standings = calculateStandings();
+    // Calcola la classifica con i risultati attuali
+    const allResults = getAllResults() || [];
+    const standings = calculateStandings(allResults);
     const getTeamPosition = (teamName) => {
         const pos = standings.findIndex(s => s.team === teamName) + 1;
         return pos > 0 ? pos : '-';
@@ -660,22 +660,68 @@ const renderUserBonusCard = async () => {
         `;
     }
     
-    // Mini Classifica
+    // Mini Classifica - Filtra solo le 2 squadre coinvolte nello stile della home
     let miniStandings = '';
     if (nextMatch) {
         const homeTeam = nextMatch.homeTeam;
         const awayTeam = nextMatch.awayTeam;
         const homeStats = standings.find(s => s.team === homeTeam);
         const awayStats = standings.find(s => s.team === awayTeam);
-        const homePos = getTeamPosition(homeTeam);
-        const awayPos = getTeamPosition(awayTeam);
-        
-        const teams = [
-            { name: homeTeam, stats: homeStats, position: homePos },
-            { name: awayTeam, stats: awayStats, position: awayPos }
-        ].sort((a, b) => a.position - b.position);
         
         if (homeStats && awayStats) {
+            // Filtra le 2 squadre e ordina per posizione
+            const twoTeams = standings.filter(s => s.team === homeTeam || s.team === awayTeam)
+                .sort((a, b) => {
+                    const posA = standings.findIndex(s => s.team === a.team) + 1;
+                    const posB = standings.findIndex(s => s.team === b.team) + 1;
+                    return posA - posB;
+                });
+            
+            // Genera HTML nello stile della classifica home (mobile)
+            let html = `<div class="bg-gray-900 rounded">
+                <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(55, 65, 81, 1); background-color: rgba(31, 41, 55, 1); white-space: nowrap;">
+                    <div style="width: 30px; text-align: left; flex-shrink: 0;">
+                        <span class="text-gray-400 text-xs font-bold uppercase">#</span>
+                    </div>
+                    <div style="width: 24px; flex-shrink: 0;"></div>
+                    <div style="flex-grow: 1; text-align: left;">
+                        <span class="text-gray-400 text-xs font-bold uppercase">Squadra</span>
+                    </div>
+                    <span class="text-gray-400 text-xs font-bold uppercase" style="width: 35px; text-align: right; flex-shrink: 0; margin-left: 0.75rem;">Pt</span>
+                    <span class="text-gray-400 text-xs font-bold uppercase" style="width: 45px; text-align: center; flex-shrink: 0; margin-left: 0.5rem;">PTI</span>
+                </div>
+            `;
+            
+            twoTeams.forEach(team => {
+                const pos = standings.findIndex(s => s.team === team.team) + 1;
+                let posClass = 'text-gray-400';
+                if (pos === 1) {
+                    posClass = 'text-yellow-400 font-bold';
+                } else if (pos === 2) {
+                    posClass = 'text-gray-300 font-semibold';
+                } else if (pos === 3) {
+                    posClass = 'text-orange-400 font-semibold';
+                }
+                
+                const fantasyPoints = (team.fantasyPoints || 0).toFixed(1);
+                const teamNameSafe = team.team || 'Unknown';
+                
+                html += `
+                    <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(55, 65, 81, 1); white-space: nowrap; overflow: hidden;">
+                        <div style="width: 30px; text-align: center; flex-shrink: 0;">
+                            <span class="${posClass} text-lg font-bold">${pos}</span>
+                        </div>
+                        <img src="${getTeamLogo(teamNameSafe)}" alt="${teamNameSafe}" style="width: 24px; height: 24px; margin: 0 0.5rem 0 0.25rem; flex-shrink: 0; display: block;" onerror="this.style.display='none'">
+                        <div style="flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <span class="text-white font-semibold text-sm" title="${teamNameSafe}" style="display: block;">${teamNameSafe}</span>
+                        </div>
+                        <span class="text-blue-400 font-bold text-sm" style="width: 35px; text-align: right; flex-shrink: 0; margin-left: 0.75rem;">${team.points}</span>
+                        <span class="text-green-400 font-bold text-sm" style="width: 45px; text-align: right; flex-shrink: 0; margin-left: 0.5rem;">${fantasyPoints}</span>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
             miniStandings = `
                 <div class="bg-gray-900/50 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
                     <h4 class="text-center text-sm sm:text-lg font-bold text-yellow-500 mb-2 sm:mb-3 flex items-center justify-center">
@@ -685,47 +731,9 @@ const renderUserBonusCard = async () => {
                         </svg>
                         Classifica
                     </h4>
-                    <div class="overflow-x-auto -mx-1">
-                        <table class="w-full text-xs">
-                            <thead>
-                                <tr class="text-gray-400 border-b border-gray-700">
-                                    <th class="text-left py-2 px-1">#</th>
-                                    <th class="text-left py-2 px-1">Squadra</th>
-                                    <th class="text-center py-2 px-1">Pt</th>
-                                    <th class="text-center py-2 px-1 hidden sm:table-cell">G</th>
-                                    <th class="text-center py-2 px-1 hidden md:table-cell">V</th>
-                                    <th class="text-center py-2 px-1 hidden md:table-cell">N</th>
-                                    <th class="text-center py-2 px-1 hidden md:table-cell">P</th>
-                                    <th class="text-center py-2 px-1">GF</th>
-                                    <th class="text-center py-2 px-1">GS</th>
-                                    <th class="text-center py-2 px-1">DR</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${teams.map((team, idx) => `
-                                <tr class="${idx === 0 ? 'border-b border-gray-800' : ''} ${team.name === userSquad ? 'bg-blue-900/30' : ''}">
-                                    <td class="py-2 px-1 font-bold text-yellow-500">${team.position}</td>
-                                    <td class="py-2 px-1">
-                                        <div class="flex items-center gap-1.5">
-                                            ${getTeamLogo(team.name) ? `<img src="${getTeamLogo(team.name)}" alt="${team.name}" class="w-5 h-5 sm:w-6 sm:h-6 object-contain flex-shrink-0" onerror="this.style.display='none'">` : ''}
-                                            <span class="font-semibold ${team.name === userSquad ? 'text-blue-400' : 'text-white'} leading-tight line-clamp-2">${team.name}</span>
-                                        </div>
-                                    </td>
-                                    <td class="text-center py-2 px-1 font-bold text-green-400">${team.stats.points}</td>
-                                    <td class="text-center py-2 px-1 text-gray-300 hidden sm:table-cell">${team.stats.played}</td>
-                                    <td class="text-center py-2 px-1 text-gray-300 hidden md:table-cell">${team.stats.wins}</td>
-                                    <td class="text-center py-2 px-1 text-gray-300 hidden md:table-cell">${team.stats.draws}</td>
-                                    <td class="text-center py-2 px-1 text-gray-300 hidden md:table-cell">${team.stats.losses}</td>
-                                    <td class="text-center py-2 px-1 text-gray-300">${team.stats.goalsFor}</td>
-                                    <td class="text-center py-2 px-1 text-gray-300">${team.stats.goalsAgainst}</td>
-                                    <td class="text-center py-2 px-1 font-semibold ${team.stats.goalDifference > 0 ? 'text-green-400' : team.stats.goalDifference < 0 ? 'text-red-400' : 'text-gray-400'}">${team.stats.goalDifference > 0 ? '+' : ''}${team.stats.goalDifference}</td>
-                                </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+                    ${html}
                     <div class="text-center mt-2 text-xs text-gray-500">
-                        <span class="hidden sm:inline">Pt=Punti | G=Giocate | </span><span class="hidden md:inline">V=Vittorie | N=Pareggi | P=Perse | </span>GF=Gol Fatti | GS=Gol Subiti | DR=Diff. Reti
+                        Pt=Punti | PTI=Punti Fantacalcio
                     </div>
                 </div>
             `;

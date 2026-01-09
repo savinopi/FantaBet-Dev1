@@ -50,6 +50,10 @@ export const TEAM_LOGOS = {
  * @returns {string} URL del logo o placeholder SVG
  */
 export const getTeamLogo = (teamName) => {
+    // Handle undefined or empty teamName
+    if (!teamName) {
+        return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Crect width='50' height='50' fill='%23374151'/%3E%3Ctext x='25' y='25' font-size='20' text-anchor='middle' dominant-baseline='middle' fill='%239CA3AF'%3E?%3C/text%3E%3C/svg%3E`;
+    }
     const logoFile = TEAM_LOGOS[teamName];
     if (logoFile) {
         return `${GITHUB_LOGOS_BASE_URL}/${encodeURIComponent(logoFile)}`;

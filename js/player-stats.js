@@ -767,6 +767,9 @@ const renderSquadsView = (squadsMap) => {
         // Calcola la media di FantaMedia per la squadra
         let totalFantaMedia = 0;
         let countFantaMedia = 0;
+        let totalMediaVoto = 0;
+        let countMediaVoto = 0;
+        
         players.forEach(player => {
             const normalizedName = (player.playerName || '').trim().toLowerCase();
             const stat = statsMap.get(normalizedName);
@@ -774,8 +777,13 @@ const renderSquadsView = (squadsMap) => {
                 totalFantaMedia += stat.fm;
                 countFantaMedia++;
             }
+            if (stat && stat.mv) {
+                totalMediaVoto += stat.mv;
+                countMediaVoto++;
+            }
         });
         const avgFantaMedia = countFantaMedia > 0 ? (totalFantaMedia / countFantaMedia).toFixed(2) : '-';
+        const avgMediaVoto = countMediaVoto > 0 ? (totalMediaVoto / countMediaVoto).toFixed(2) : '-';
         
         // Header della squadra
         html += `
@@ -794,6 +802,10 @@ const renderSquadsView = (squadsMap) => {
                                 <div class="bg-yellow-700/50 px-3 py-1 rounded-full border border-yellow-500">
                                     <span class="text-gray-300">💰</span>
                                     <span class="text-yellow-300 font-bold ml-1">${totalCost}</span>
+                                </div>
+                                <div class="bg-green-700/50 px-3 py-1 rounded-full border border-green-500">
+                                    <span class="text-gray-300">⭐</span>
+                                    <span class="text-green-300 font-bold ml-1">MV Avg: ${avgMediaVoto}</span>
                                 </div>
                                 <div class="bg-blue-700/50 px-3 py-1 rounded-full border border-blue-500">
                                     <span class="text-gray-300">📊</span>
