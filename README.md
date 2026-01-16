@@ -1,6 +1,34 @@
 # FANTABet - Struttura Progetto
 
-**Versione: 3.8**
+**Versione: 3.9**
+
+## 🆕 Changelog v3.9
+
+### Allegati Giornate (File Attachment System)
+- **Modal Allegati**: Nuova finestra modale per gestire file allegati a ogni giornata della sezione "Risultati Storici"
+- **Admin Upload**: Solo gli admin possono caricare file allegati (pulsante "Scegli File" e "Carica" visibili solo per admin)
+- **View-Only Per Utenti**: Utenti non-admin possono visualizzare e scaricare file allegati, ma non caricarli
+- **Limite 15 MB**: Validazione lato client che impedisce il caricamento di file > 15 MB con messaggio di errore chiaro
+- **Firestore Integration**: File metadata salvati in collection `giornate_attachments` con tracciamento:
+  - Numero giornata
+  - Nome file, dimensione, tipo MIME
+  - Data/ora caricamento
+  - UID utente che ha caricato
+- **Download/Delete**: Pulsanti per scaricare o eliminare file (delete solo per admin)
+
+### Bonus Management Tab
+- **Sezione Admin Bonus**: Nuova tab nel pannello Admin dedicata alla gestione bonus squadre
+- **Tre Tipi di Bonus**: 
+  - RG (Raddoppio Goal) - Rappresentato in rosso
+  - 2G (Assegna 2 Goal) - Rappresentato in blu
+  - SC (Scudo) - Rappresentato in verde
+- **Card Squadre**: Visualizzazione bonus per ogni squadra con contatori
+- **Salva Bonus**: Pulsante per salvare modifiche su Firestore
+- **Carica Bonus**: Pulsante per ricaricare i dati dal database
+- **Firestore Sync**: Sincronizzazione completa con collection `bonus_squadre`
+
+### Footer Update
+- **Versione aggiornata**: Cambiato da v3.8 a v3.9
 
 ## 🆕 Changelog v3.8
 

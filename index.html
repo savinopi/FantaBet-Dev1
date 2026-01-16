@@ -94,6 +94,88 @@
     </div>
 
     <!-- ========================================
+         MODAL ALLEGATI GIORNATA
+         ======================================== -->
+    <div id="giornata-attachments-modal" class="hidden fixed inset-0 bg-black/95 z-[9999] overflow-auto">
+        <div class="min-h-screen p-4 flex items-center justify-center">
+            <div class="bg-gray-900 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+                <!-- Header -->
+                <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 p-6 flex items-center justify-between border-b-2 border-blue-400">
+                    <div>
+                        <h3 class="text-2xl font-bold text-white flex items-center">
+                            <svg class="w-7 h-7 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"></path>
+                                <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z"></path>
+                            </svg>
+                            Allegati Giornata <span id="modal-giornata-number" class="ml-2 text-blue-200"></span>
+                        </h3>
+                        <p id="modal-giornata-date" class="text-sm text-blue-100 mt-1"></p>
+                    </div>
+                    <button onclick="closeAttachmentsModal()" class="text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                        Chiudi
+                    </button>
+                </div>
+
+                <!-- Contenuto Modal -->
+                <div class="p-6 space-y-6">
+                    <!-- Sezione Upload (solo Admin) -->
+                    <div id="giornata-upload-section" class="bg-gray-800/50 rounded-lg p-4 border-2 border-dashed border-blue-500/50">
+                        <h4 class="text-lg font-bold text-blue-400 mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            Carica Nuovo File
+                        </h4>
+                        <div class="space-y-3">
+                            <input type="file" id="giornata-file-input" class="hidden" onchange="handleGiornataFileSelect()" accept="*/*" aria-label="Seleziona file allegato">
+                            <div class="flex gap-2">
+                                <button onclick="triggerGiornataFileInput()" class="btn-primary flex-1">
+                                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Seleziona File
+                                </button>
+                                <button id="giornata-upload-button" onclick="uploadGiornataAttachment()" class="btn-success" disabled>
+                                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                    </svg>
+                                    Carica
+                                </button>
+                            </div>
+                            <span id="giornata-file-name-display" class="text-sm text-gray-400">Nessun file selezionato</span>
+                            <div id="giornata-upload-progress" class="hidden">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm text-gray-400">Caricamento in corso...</span>
+                                    <span id="giornata-upload-percentage" class="text-sm font-bold text-blue-400">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div id="giornata-upload-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sezione File Caricati -->
+                    <div>
+                        <h4 class="text-lg font-bold text-green-400 mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
+                            </svg>
+                            File Allegati
+                        </h4>
+                        <div id="giornata-attachments-list" class="space-y-2">
+                            <p class="text-gray-400 text-center py-4">Nessun file allegato a questa giornata</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================
          MODAL STATISTICHE SQUADRA
          ======================================== -->
     <div id="team-stats-modal" class="hidden fixed inset-0 bg-black/95 z-[9999] overflow-auto">
@@ -489,6 +571,12 @@
                             </svg>
                             Scommesse
                         </button>
+                        <button onclick="switchAdminTab('bonus')" id="admin-nav-bonus" class="admin-nav-tab px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500">
+                            <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                            </svg>
+                            Bonus
+                        </button>
                         <button onclick="switchAdminTab('data')" id="admin-nav-data" class="admin-nav-tab px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500">
                             <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
@@ -670,6 +758,59 @@
                                 <div id="stats-data-container" class="overflow-x-auto">
                                     <p class="text-gray-500 text-sm">Nessuna statistica caricata.</p>
                                 </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab Gestione Bonus (solo desktop) -->
+                        <div id="admin-tab-bonus-content" class="admin-tab-content admin-only admin-desktop-only hidden">
+                            <h3 class="text-lg font-bold text-blue-400 mb-4">Gestione Bonus Squadre</h3>
+                            
+                            <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg px-4 py-3 mb-4">
+                                <p class="text-sm text-blue-300">
+                                    <svg class="w-5 h-5 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    <strong>Tipologie Bonus:</strong> RG (Raddoppio Goal) | 2G (Assegna 2 Goal) | SC (Scudo)
+                                    <br>Imposta quanti bonus ha ogni squadra e seleziona la giornata in cui è stato utilizzato.
+                                </p>
+                            </div>
+                            
+                            <div class="mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                                <button onclick="loadBonusData()" class="btn-primary flex-1 sm:flex-none">
+                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    Ricarica Dati
+                                </button>
+                                <button onclick="saveBonusData()" class="btn-success flex-1 sm:flex-none">
+                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    Salva Modifiche
+                                </button>
+                            </div>
+                            
+                            <!-- Legenda bonus compatta -->
+                            <div class="bg-gray-800/50 border border-gray-600/30 rounded-lg px-3 py-2 mb-4">
+                                <div class="flex flex-wrap justify-around gap-2 text-xs">
+                                    <div class="flex items-center">
+                                        <span class="w-6 h-6 bg-red-900 text-red-300 rounded font-bold flex items-center justify-center mr-1 text-sm">×2</span>
+                                        <span class="text-gray-400">Raddoppio</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <span class="w-6 h-6 bg-green-900 text-green-300 rounded font-bold flex items-center justify-center mr-1 text-sm">+2</span>
+                                        <span class="text-gray-400">2 Goal</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <span class="w-6 h-6 bg-blue-900 text-blue-300 rounded font-bold flex items-center justify-center mr-1 text-xs">SC</span>
+                                        <span class="text-gray-400">Scudo</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Container per cards mobile-friendly -->
+                            <div id="bonus-cards-container" class="space-y-3">
+                                <!-- Cards renderizzate da JS -->
                             </div>
                         </div>
                         
@@ -1006,7 +1147,9 @@
                             <option value="all">Tutte le giornate</option>
                         </select>
                     </div>
-                    <div id="historic-results-table-2" class="space-y-4"></div>
+                    <div class="overflow-x-auto -mx-4 sm:mx-0">
+                        <div id="historic-results-table-2" class="space-y-2 px-4 sm:px-0"></div>
+                    </div>
                 </div>
 
                 <!-- SEZIONE ANDAMENTO CLASSIFICA -->
@@ -1558,7 +1701,7 @@
         
         /**
          * Cambia il tab interno alla sezione Admin (solo desktop)
-         * @param {string} tab - users, schedules, bets, data
+         * @param {string} tab - users, schedules, bets, bonus, data, danger
          */
         function switchAdminTab(tab) {
             // Nascondi tutti i contenuti admin
@@ -1597,6 +1740,9 @@
             } else if (tab === 'bets' && window.renderAdminBetsFilter) {
                 console.log('📌 Tab Scommesse cliccato - Caricando scommesse...');
                 window.renderAdminBetsFilter('all');
+            } else if (tab === 'bonus' && window.loadBonusData) {
+                console.log('📌 Tab Bonus cliccato - Caricando bonus...');
+                window.loadBonusData();
             }
         }
         
@@ -3072,7 +3218,7 @@
     <!-- Footer versione -->
     <footer class="bg-gray-900 border-t border-gray-800 py-4 mt-8">
         <div class="text-center text-gray-500 text-sm">
-            <p>FantaBet v3.8</p>
+            <p>FantaBet v3.9</p>
             <p class="text-xs text-gray-600" id="update-timestamp"></p>
         </div>
     </footer>
@@ -3112,6 +3258,219 @@
         } else {
             loadLastCommit();
         }
+
+        // ========================================
+        // GESTIONE ALLEGATI GIORNATE
+        // ========================================
+        let selectedGiornataFile = null;
+        let currentGiornataForAttachments = null;
+        const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB in bytes
+
+        window.triggerGiornataFileInput = () => {
+            document.getElementById('giornata-file-input').click();
+        };
+
+        window.handleGiornataFileSelect = () => {
+            const fileInput = document.getElementById('giornata-file-input');
+            const file = fileInput.files[0];
+            const fileNameDisplay = document.getElementById('giornata-file-name-display');
+            const uploadButton = document.getElementById('giornata-upload-button');
+            
+            if (file) {
+                // Controlla il limite di 15 MB
+                if (file.size > MAX_FILE_SIZE) {
+                    const maxSizeMB = MAX_FILE_SIZE / 1024 / 1024;
+                    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+                    fileNameDisplay.innerHTML = `<span class="text-red-400">❌ File troppo grande!</span> ${fileSizeMB} MB (massimo: ${maxSizeMB} MB)`;
+                    uploadButton.disabled = true;
+                    selectedGiornataFile = null;
+                    return;
+                }
+                
+                selectedGiornataFile = file;
+                fileNameDisplay.textContent = `📄 ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                uploadButton.disabled = false;
+            }
+        };
+
+        window.uploadGiornataAttachment = async () => {
+            if (!selectedGiornataFile || !currentGiornataForAttachments) return;
+
+            // Validazione ulteriore sulla dimensione del file
+            if (selectedGiornataFile.size > MAX_FILE_SIZE) {
+                messageBox('❌ Il file supera il limite massimo di 15 MB');
+                return;
+            }
+
+            const progressDiv = document.getElementById('giornata-upload-progress');
+            const progressBar = document.getElementById('giornata-upload-bar');
+            const progressPercentage = document.getElementById('giornata-upload-percentage');
+            
+            progressDiv.classList.remove('hidden');
+
+            try {
+                // Simula caricamento del file
+                const formData = new FormData();
+                formData.append('file', selectedGiornataFile);
+                formData.append('giornata', currentGiornataForAttachments);
+
+                // Incrementa la progress bar
+                let progress = 0;
+                const interval = setInterval(() => {
+                    if (progress < 90) {
+                        progress += Math.random() * 30;
+                        if (progress > 90) progress = 90;
+                    }
+                    progressBar.style.width = progress + '%';
+                    progressPercentage.textContent = Math.floor(progress) + '%';
+                }, 200);
+
+                // Salva su Firestore
+                const fileUrl = `attachments/giornata_${currentGiornataForAttachments}/${selectedGiornataFile.name}`;
+                
+                // Crea documento in Firestore per gli allegati
+                const attachmentDoc = {
+                    giornata: currentGiornataForAttachments,
+                    fileName: selectedGiornataFile.name,
+                    fileSize: selectedGiornataFile.size,
+                    fileType: selectedGiornataFile.type,
+                    uploadedAt: new Date(),
+                    uploadedBy: userId || 'admin'
+                };
+
+                // Aggiungi a Firestore
+                const attachmentsRef = db.collection('giornate_attachments');
+                await attachmentsRef.add(attachmentDoc);
+
+                clearInterval(interval);
+                progressBar.style.width = '100%';
+                progressPercentage.textContent = '100%';
+
+                setTimeout(() => {
+                    progressDiv.classList.add('hidden');
+                    progressBar.style.width = '0%';
+                    progressPercentage.textContent = '0%';
+                    
+                    selectedGiornataFile = null;
+                    document.getElementById('giornata-file-input').value = '';
+                    document.getElementById('giornata-file-name-display').textContent = 'Nessun file selezionato';
+                    document.getElementById('giornata-upload-button').disabled = true;
+                    
+                    // Ricarica gli allegati
+                    loadGiornataAttachments(currentGiornataForAttachments);
+                    messageBox('File caricato con successo! ✓');
+                }, 500);
+            } catch (error) {
+                console.error('Errore caricamento file:', error);
+                messageBox('Errore nel caricamento del file');
+                progressDiv.classList.add('hidden');
+            }
+        };
+
+        window.openAttachmentsModal = async (giornata, data) => {
+            currentGiornataForAttachments = giornata;
+            document.getElementById('modal-giornata-number').textContent = giornata;
+            document.getElementById('modal-giornata-date').textContent = data;
+            document.getElementById('giornata-attachments-modal').classList.remove('hidden');
+            
+            // Mostra/nascondi la sezione di upload basandosi sui permessi admin
+            const uploadSection = document.getElementById('giornata-upload-section');
+            if (uploadSection) {
+                if (isUserAdmin) {
+                    uploadSection.classList.remove('hidden');
+                } else {
+                    uploadSection.classList.add('hidden');
+                }
+            }
+            
+            // Carica gli allegati per questa giornata
+            await loadGiornataAttachments(giornata);
+        };
+
+        window.closeAttachmentsModal = () => {
+            document.getElementById('giornata-attachments-modal').classList.add('hidden');
+            currentGiornataForAttachments = null;
+            selectedGiornataFile = null;
+        };
+
+        window.loadGiornataAttachments = async (giornata) => {
+            try {
+                const attachmentsList = document.getElementById('giornata-attachments-list');
+                attachmentsList.innerHTML = '<p class="text-gray-400 text-center py-4">Caricamento allegati...</p>';
+
+                const db = window.db;
+                if (!db) return;
+
+                const snapshot = await db.collection('giornate_attachments')
+                    .where('giornata', '==', giornata)
+                    .orderBy('uploadedAt', 'desc')
+                    .get();
+
+                if (snapshot.empty) {
+                    attachmentsList.innerHTML = '<p class="text-gray-400 text-center py-4">Nessun file allegato a questa giornata</p>';
+                    return;
+                }
+
+                let html = '<div class="space-y-2">';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const fileSize = (data.fileSize / 1024 / 1024).toFixed(2);
+                    const uploadDate = data.uploadedAt ? new Date(data.uploadedAt.toDate()).toLocaleString('it-IT') : 'Data non disponibile';
+                    
+                    html += `
+                        <div class="bg-gray-800/70 rounded-lg p-3 flex items-center justify-between border-l-4 border-blue-500 hover:bg-gray-800/90 transition-colors">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-white truncate">📄 ${data.fileName}</p>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    <span>${fileSize} MB</span> • 
+                                    <span>${uploadDate}</span>
+                                </p>
+                            </div>
+                            <div class="flex gap-2 ml-4 flex-shrink-0">
+                                <button onclick="downloadAttachment('${doc.id}', '${data.fileName}')" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-semibold transition-colors flex items-center gap-1 whitespace-nowrap">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                                    </svg>
+                                    Scarica
+                                </button>
+                                <button onclick="deleteAttachment('${doc.id}', '${data.fileName}')" 
+                                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-semibold transition-colors flex items-center gap-1 whitespace-nowrap">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Elimina
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                attachmentsList.innerHTML = html;
+            } catch (error) {
+                console.error('Errore caricamento allegati:', error);
+                document.getElementById('giornata-attachments-list').innerHTML = '<p class="text-red-400 text-center py-4">Errore nel caricamento dei file</p>';
+            }
+        };
+
+        window.downloadAttachment = (attachmentId, fileName) => {
+            messageBox(`Download di ${fileName} in corso...`);
+            // In una vera implementazione, qui scaricheresti il file da Firebase Storage
+            console.log('Download:', attachmentId, fileName);
+        };
+
+        window.deleteAttachment = async (attachmentId, fileName) => {
+            if (!confirm(`Sei sicuro di voler eliminare "${fileName}"?`)) return;
+
+            try {
+                await window.db.collection('giornate_attachments').doc(attachmentId).delete();
+                messageBox('File eliminato con successo ✓');
+                await loadGiornataAttachments(currentGiornataForAttachments);
+            } catch (error) {
+                console.error('Errore eliminazione file:', error);
+                messageBox('Errore nell\'eliminazione del file');
+            }
+        };
     </script>
 
 </body>

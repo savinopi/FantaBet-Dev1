@@ -115,10 +115,18 @@ export const renderHistoricResults = (results) => {
         // Intestazione Giornata
         html += `
             <div class="mb-8" data-giornata="${giornata}">
-                <div class="border-b-2 border-blue-500 pb-3 mb-5">
+                <div class="border-b-2 border-blue-500 pb-3 mb-5 flex items-center justify-between">
                     <h3 class="text-2xl font-bold text-blue-400">
                         ${giornata.startsWith('Aggiunta Manuale') ? giornata : `Giornata ${giornata}`}
                     </h3>
+                    <button onclick="openAttachmentsModal('${giornata}', 'Giornata ${giornata}')" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 flex-shrink-0">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"></path>
+                            <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z"></path>
+                        </svg>
+                        Allegati
+                    </button>
                 </div>
         `;
 
