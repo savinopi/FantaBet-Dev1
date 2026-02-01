@@ -18,6 +18,7 @@ import {
     onSnapshot,
     query,
     where,
+    orderBy,
     limit,
     doc,
     getDoc,
@@ -265,7 +266,7 @@ const updateHomeWelcome = (userProfile) => {
         
         // Calcola e mostra posizione in classifica
         if (teamPositionEl) {
-            const standings = calculateStandings(state.getAllResults());
+            const standings = calculateStandings();
             if (standings && standings.length > 0) {
                 const position = standings.findIndex(s => s.team === squadName) + 1;
                 if (position > 0) {
@@ -690,10 +691,32 @@ const setupListeners = () => {
     
     // Listener per i Risultati Storici
     addUnsubscribe(
-        onSnapshot(getResultsCollectionRef(), (snapshot) => {
+        onSnapshot(getResultsCollectionRef(), async (snapshot) => {
             const results = snapshot.docs.map(doc => doc.data());
             state.setAllResults(results);
-            renderHistoricResults(results);
+            
+            // Carica le date degli orari delle giornate
+            const giornateData = {};
+            try {
+                const scheduleSnapshot = await getDocs(getScheduleCollectionRef());
+                scheduleSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.giornata && data.date) {
+                        // Normalizza la giornata come stringa per il matching
+                        const giornataKey = String(data.giornata);
+                        giornateData[giornataKey] = data.date;
+                        console.log(`[DEBUG Schedule] Giornata ${giornataKey}: ${data.date}`);
+                    }
+                });
+                console.log('[DEBUG] giornateData caricato:', giornateData);
+                // Salva giornateData globalmente per accesso da altri componenti
+                window.giornateData = giornateData;
+            } catch (error) {
+                console.error('Errore caricamento orari giornate:', error);
+            }
+            
+            // Passa sia i risultati che le date delle giornate
+            renderHistoricResults(results, giornateData);
             renderStandings();
             renderStatistics();
             renderStandingsTrend();
@@ -1620,6 +1643,185 @@ window.onload = () => {
     if (!window.FANTABetInitialized) {
         initializeApp();
         window.FANTABetInitialized = true;
+    }
+};
+
+// ===================================
+// GESTIONE ALLEGATI GIORNATE (Global Functions)
+// ===================================
+
+window.loadGiornataAttachments = async (giornata) => {
+    try {
+        const attachmentsList = document.getElementById('giornata-attachments-list');
+        if (!attachmentsList) return;
+        
+        attachmentsList.innerHTML = '<p class="text-gray-400 text-center py-4">Caricamento allegati...</p>';
+
+        // Query senza orderBy (ordineremo in memoria per evitare indici compositi)
+        const q = query(
+            collection(db, 'giornate_attachments'),
+            where('giornata', '==', giornata)
+        );
+        
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            attachmentsList.innerHTML = '<p class="text-gray-400 text-center py-4">Nessun file allegato a questa giornata</p>';
+            return;
+        }
+
+        // Raccogli i dati e ordina in memoria
+        const attachments = [];
+        snapshot.forEach(docSnapshot => {
+            attachments.push({
+                id: docSnapshot.id,
+                ...docSnapshot.data()
+            });
+        });
+        
+        // Ordina per uploadedAt decrescente (più recenti prima)
+        attachments.sort((a, b) => {
+            const dateA = a.uploadedAt ? new Date(a.uploadedAt.toDate()).getTime() : 0;
+            const dateB = b.uploadedAt ? new Date(b.uploadedAt.toDate()).getTime() : 0;
+            return dateB - dateA;
+        });
+
+        let html = '<div class="space-y-2">';
+        attachments.forEach(data => {
+            const fileSize = (data.fileSize / 1024 / 1024).toFixed(2);
+            const uploadDate = data.uploadedAt ? new Date(data.uploadedAt.toDate()).toLocaleString('it-IT') : 'Data non disponibile';
+            
+            html += `
+                <div class="bg-gray-800/70 rounded-lg p-3 flex items-center justify-between border-l-4 border-blue-500 hover:bg-gray-800/90 transition-colors">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-white truncate">📄 ${data.fileName}</p>
+                        <p class="text-xs text-gray-400 mt-1">
+                            <span>${fileSize} MB</span> • 
+                            <span>${uploadDate}</span>
+                        </p>
+                    </div>
+                    <div class="flex gap-2 ml-4 flex-shrink-0">
+                        <button onclick="downloadAttachment('${data.id}', '${data.fileName}')" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-semibold transition-colors flex items-center gap-1 whitespace-nowrap">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                            </svg>
+                            Scarica
+                        </button>
+                        <button onclick="deleteAttachment('${data.id}', '${data.fileName}')" 
+                            class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-semibold transition-colors flex items-center gap-1 whitespace-nowrap">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                            Elimina
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        attachmentsList.innerHTML = html;
+    } catch (error) {
+        console.error('Errore caricamento allegati:', error);
+        const attachmentsList = document.getElementById('giornata-attachments-list');
+        if (attachmentsList) {
+            attachmentsList.innerHTML = '<p class="text-red-400 text-center py-4">Errore nel caricamento dei file</p>';
+        }
+    }
+};
+
+window.downloadAttachment = (attachmentId, fileName) => {
+    messageBox(`Download di ${fileName} in corso...`);
+    // In una vera implementazione, qui scaricheresti il file da Firebase Storage
+    console.log('Download:', attachmentId, fileName);
+};
+
+window.deleteAttachment = async (attachmentId, fileName) => {
+    if (!confirm(`Sei sicuro di voler eliminare "${fileName}"?`)) return;
+
+    try {
+        await deleteDoc(doc(collection(db, 'giornate_attachments'), attachmentId));
+        messageBox('File eliminato con successo ✓');
+        
+        // Ricarica allegati
+        const currentGiornataForAttachments = window.currentGiornataForAttachments;
+        if (currentGiornataForAttachments) {
+            await window.loadGiornataAttachments(currentGiornataForAttachments);
+        }
+    } catch (error) {
+        console.error('Errore eliminazione file:', error);
+        messageBox('Errore nell\'eliminazione del file');
+    }
+};
+
+window.uploadGiornataAttachment = async () => {
+    const selectedGiornataFile = window.selectedGiornataFile;
+    const currentGiornataForAttachments = window.currentGiornataForAttachments;
+    
+    if (!selectedGiornataFile || !currentGiornataForAttachments) return;
+
+    // Validazione ulteriore sulla dimensione del file
+    const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB in bytes
+    if (selectedGiornataFile.size > MAX_FILE_SIZE) {
+        messageBox('❌ File troppo grande! Dimensione massima: 15 MB');
+        return;
+    }
+
+    const progressDiv = document.getElementById('giornata-upload-progress');
+    const progressBar = document.getElementById('giornata-upload-bar');
+    const progressPercentage = document.getElementById('giornata-upload-percentage');
+    
+    if (progressDiv) progressDiv.classList.remove('hidden');
+
+    try {
+        // Simula caricamento con progress bar
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 30;
+            if (progress > 90) progress = 90;
+            if (progressBar) progressBar.style.width = progress + '%';
+            if (progressPercentage) progressPercentage.textContent = Math.floor(progress) + '%';
+        }, 200);
+
+        // Crea documento in Firestore per gli allegati
+        const attachmentDoc = {
+            giornata: currentGiornataForAttachments,
+            fileName: selectedGiornataFile.name,
+            fileSize: selectedGiornataFile.size,
+            fileType: selectedGiornataFile.type,
+            uploadedAt: new Date(),
+            uploadedBy: window.userId || 'admin'
+        };
+
+        // Aggiungi a Firestore
+        const attachmentsRef = collection(db, 'giornate_attachments');
+        await addDoc(attachmentsRef, attachmentDoc);
+
+        clearInterval(interval);
+        if (progressBar) progressBar.style.width = '100%';
+        if (progressPercentage) progressPercentage.textContent = '100%';
+
+        setTimeout(() => {
+            if (progressDiv) progressDiv.classList.add('hidden');
+            if (progressBar) progressBar.style.width = '0%';
+            if (progressPercentage) progressPercentage.textContent = '0%';
+            
+            window.selectedGiornataFile = null;
+            const fileInput = document.getElementById('giornata-file-input');
+            if (fileInput) fileInput.value = '';
+            const fileNameDisplay = document.getElementById('giornata-file-name-display');
+            if (fileNameDisplay) fileNameDisplay.textContent = 'Nessun file selezionato';
+            const uploadButton = document.getElementById('giornata-upload-button');
+            if (uploadButton) uploadButton.disabled = true;
+            
+            // Ricarica gli allegati
+            window.loadGiornataAttachments(currentGiornataForAttachments);
+            messageBox('File caricato con successo! ✓');
+        }, 500);
+    } catch (error) {
+        console.error('Errore caricamento file:', error);
+        messageBox('Errore nel caricamento del file');
+        if (progressDiv) progressDiv.classList.add('hidden');
     }
 };
 

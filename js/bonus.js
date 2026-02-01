@@ -16,7 +16,7 @@ import { messageBox, showProgressBar, hideProgressBar, updateProgressBar, update
 import { getTeamLogo } from './config.js';
 import { getIsUserAdmin, getCurrentUserProfile } from './auth.js';
 import { getAllMatches, getAllResults } from './state.js';
-import { calculateStandings } from './rendering.js';
+import { calculateStandings } from './bets.js';
 
 // Dati correnti dei bonus
 let currentBonusData = [];

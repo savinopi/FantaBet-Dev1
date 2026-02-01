@@ -12,6 +12,7 @@ import {
     getPlayersCollectionRef, 
     getPlayerStatsCollectionRef 
 } from './firebase-config.js';
+import { calculateStandings } from './bets.js';
 
 // ===================================
 // HEADER SEZIONE RIUTILIZZABILE
@@ -45,8 +46,11 @@ export const createSectionHeader = (title, colorClass) => {
 export const formatDateItalian = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString + 'T00:00:00');
+    console.log(`[DEBUG formatDateItalian] Input: "${dateString}" → Date obj: ${date} → isValid: ${!isNaN(date)}`);
     const options = { day: '2-digit', month: 'short', year: 'numeric' };
-    return date.toLocaleDateString('it-IT', options);
+    const formatted = date.toLocaleDateString('it-IT', options);
+    console.log(`[DEBUG formatDateItalian] Output: "${formatted}"`);
+    return formatted;
 };
 
 // ===================================
@@ -57,7 +61,7 @@ export const formatDateItalian = (dateString) => {
  * Renderizza la tabella dei risultati storici
  * @param {Array} results - Array dei risultati
  */
-export const renderHistoricResults = (results) => {
+export const renderHistoricResults = (results, giornateData = {}) => {
     const tableContainer = document.getElementById('historic-results-table').parentElement;
     const table = document.getElementById('historic-results-table');
     if (!table) return;
@@ -112,13 +116,20 @@ export const renderHistoricResults = (results) => {
 
         const sortedDates = Object.keys(matchesByDate).sort((a, b) => new Date(a) - new Date(b));
 
+        // Ottieni la data della giornata da giornateData se disponibile
+        const giornataDate = giornateData[giornata];
+        console.log(`[DEBUG renderHistoricResults] Giornata ${giornata}: giornataDate="${giornataDate}"`);
+
         // Intestazione Giornata
         html += `
             <div class="mb-8" data-giornata="${giornata}">
                 <div class="border-b-2 border-blue-500 pb-3 mb-5 flex items-center justify-between">
-                    <h3 class="text-2xl font-bold text-blue-400">
-                        ${giornata.startsWith('Aggiunta Manuale') ? giornata : `Giornata ${giornata}`}
-                    </h3>
+                    <div>
+                        <h3 class="text-2xl font-bold text-blue-400">
+                            ${giornata.startsWith('Aggiunta Manuale') ? giornata : `Giornata ${giornata}`}
+                        </h3>
+                        ${giornataDate ? `<p class="text-sm text-gray-400 mt-1">${formatDateItalian(giornataDate)}</p>` : '<p class="text-sm text-gray-500 mt-1">Data non disponibile</p>'}
+                    </div>
                     <button onclick="openAttachmentsModal('${giornata}', 'Giornata ${giornata}')" 
                         class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 flex-shrink-0">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -240,80 +251,7 @@ export const renderHistoricResults = (results) => {
 // RENDERING CLASSIFICA
 // ===================================
 
-/**
- * Calcola la classifica dalle partite
- * @param {Array} results - Risultati delle partite
- * @returns {Array} Classifica ordinata
- */
-export const calculateStandings = (results) => {
-    const standings = {};
-    
-    results.forEach(res => {
-        // Inizializza squadre se non presenti
-        if (!standings[res.homeTeam]) {
-            standings[res.homeTeam] = {
-                team: res.homeTeam,
-                played: 0, wins: 0, draws: 0, losses: 0,
-                goalsFor: 0, goalsAgainst: 0, points: 0, fantasyPoints: 0
-            };
-        }
-        if (!standings[res.awayTeam]) {
-            standings[res.awayTeam] = {
-                team: res.awayTeam,
-                played: 0, wins: 0, draws: 0, losses: 0,
-                goalsFor: 0, goalsAgainst: 0, points: 0, fantasyPoints: 0
-            };
-        }
-        
-        const home = standings[res.homeTeam];
-        const away = standings[res.awayTeam];
-        
-        home.played++;
-        away.played++;
-        
-        // Parse score
-        if (res.score && res.score !== 'N/A' && res.score !== '-') {
-            const [homeGoals, awayGoals] = res.score.split('-').map(s => parseInt(s.trim(), 10) || 0);
-            home.goalsFor += homeGoals;
-            home.goalsAgainst += awayGoals;
-            away.goalsFor += awayGoals;
-            away.goalsAgainst += homeGoals;
-        }
-        
-        // Calcola punti
-        if (res.result === '1') {
-            home.wins++;
-            home.points += 3;
-            away.losses++;
-        } else if (res.result === '2') {
-            away.wins++;
-            away.points += 3;
-            home.losses++;
-        } else if (res.result === 'X') {
-            home.draws++;
-            away.draws++;
-            home.points += 1;
-            away.points += 1;
-        }
-        
-        // Fantasy points (se presenti)
-        if (res.homePoints !== undefined && res.homePoints !== null && res.homePoints !== '') {
-            home.fantasyPoints += parseFloat(res.homePoints) || 0;
-        }
-        if (res.awayPoints !== undefined && res.awayPoints !== null && res.awayPoints !== '') {
-            away.fantasyPoints += parseFloat(res.awayPoints) || 0;
-        }
-    });
-    
-    // Converti in array e ordina
-    return Object.values(standings).sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
-        if (b.fantasyPoints !== a.fantasyPoints) return b.fantasyPoints - a.fantasyPoints;
-        const diffA = a.goalsFor - a.goalsAgainst;
-        const diffB = b.goalsFor - b.goalsAgainst;
-        return diffB - diffA;
-    });
-};
+
 
 /**
  * Renderizza la classifica (versione responsive)
@@ -1144,11 +1082,13 @@ export const showTeamStats = async (teamName) => {
                 R: ruolo,
                 Id: stats ? (stats.playerId || stats.Id) : null,
                 Fm: stats ? (parseFloat(stats.fm) || 0) : 0,
+                Mv: stats ? (parseFloat(stats.mv) || 0) : 0,
                 Pv: stats ? (parseInt(stats.pv) || 0) : 0,
                 Gf: stats ? (parseInt(stats.gf) || 0) : 0,
                 Gs: stats ? (parseInt(stats.gs) || 0) : 0,
                 Rp: stats ? (parseInt(stats.rp) || 0) : 0,
-                Ass: stats ? (parseInt(stats.ass) || 0) : 0
+                Ass: stats ? (parseInt(stats.ass) || 0) : 0,
+                cost: player.cost || 0
             };
         });
         
@@ -1194,6 +1134,26 @@ export const showTeamStats = async (teamName) => {
             ? assistmen.reduce((best, player) => (player.Ass || 0) > (best.Ass || 0) ? player : best)
             : playersWithStats[0];
         
+        // Calcola statistiche squadra per l'header
+        const totalCost = playersWithStats.reduce((sum, p) => sum + (p.cost || 0), 0);
+        let totalFantaMedia = 0;
+        let countFantaMedia = 0;
+        let totalMediaVoto = 0;
+        let countMediaVoto = 0;
+        
+        playersWithStats.forEach(player => {
+            if (player.Fm) {
+                totalFantaMedia += player.Fm;
+                countFantaMedia++;
+            }
+            if (player.Mv) {
+                totalMediaVoto += player.Mv;
+                countMediaVoto++;
+            }
+        });
+        const avgFantaMedia = countFantaMedia > 0 ? (totalFantaMedia / countFantaMedia).toFixed(2) : '0.00';
+        const avgMediaVoto = countMediaVoto > 0 ? (totalMediaVoto / countMediaVoto).toFixed(2) : '0.00';
+        
         // Genera HTML
         let html = `
             <!-- Header Squadra -->
@@ -1206,7 +1166,24 @@ export const showTeamStats = async (teamName) => {
                             <span class="px-3 py-1 bg-yellow-500 text-black font-bold rounded-full text-sm">#${position} in classifica</span>
                         </div>
                     </div>
-                    <div class="text-gray-400">${playersWithStats.length} giocatori</div>
+                    <div class="grid grid-cols-2 md:flex gap-2 md:gap-3">
+                        <div class="bg-purple-700/50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-purple-500 text-center">
+                            <span class="text-gray-300 text-xs sm:text-sm">👥</span>
+                            <span class="text-white font-bold ml-0.5 sm:ml-1 text-xs sm:text-sm">${playersWithStats.length}</span>
+                        </div>
+                        <div class="bg-yellow-700/50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-yellow-500 text-center">
+                            <span class="text-gray-300 text-xs sm:text-sm">💰</span>
+                            <span class="text-yellow-300 font-bold ml-0.5 sm:ml-1 text-xs sm:text-sm">${totalCost}</span>
+                        </div>
+                        <div class="bg-green-700/50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-green-500 text-center">
+                            <span class="text-gray-300 text-xs sm:text-sm">⭐</span>
+                            <span class="text-green-300 font-bold ml-0.5 sm:ml-1 text-xs sm:text-sm">MV: ${avgMediaVoto}</span>
+                        </div>
+                        <div class="bg-blue-700/50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-blue-500 text-center">
+                            <span class="text-gray-300 text-xs sm:text-sm">📊</span>
+                            <span class="text-blue-300 font-bold ml-0.5 sm:ml-1 text-xs sm:text-sm">FM: ${avgFantaMedia}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -1222,6 +1199,13 @@ export const showTeamStats = async (teamName) => {
             const player = bestByRole[ruolo];
             const ruoloInfo = ruoli[ruolo];
             if (player) {
+                // Per i portieri, mostra Gol Subiti e Rigori Parati
+                const isPortiere = ruolo === 'P';
+                const stat1 = isPortiere ? `Gs: ${player.Gs || 0}` : `Gol: ${player.Gf || 0}`;
+                const stat1Color = isPortiere ? 'text-red-400' : 'text-green-400';
+                const stat2 = isPortiere ? `Rp: ${player.Rp || 0}` : `Ass: ${player.Ass || 0}`;
+                const stat2Color = isPortiere ? 'text-yellow-400' : 'text-purple-400';
+                
                 html += `
                     <div class="bg-slate-800 border border-${ruoloInfo.color}-500/50 rounded-lg p-4">
                         <div class="flex items-center gap-3">
@@ -1229,10 +1213,15 @@ export const showTeamStats = async (teamName) => {
                             <div class="flex-1">
                                 <span class="text-xs text-${ruoloInfo.color}-400">${ruoloInfo.emoji} ${ruoloInfo.nome}</span>
                                 <h4 class="font-bold text-white">${player.Name}</h4>
-                                <div class="flex gap-4 mt-1 text-sm">
-                                    <span class="text-yellow-400">FM: ${player.Fm?.toFixed(1) || '0.0'}</span>
-                                    <span class="text-blue-400">Pv: ${player.Pv || 0}</span>
-                                    <span class="text-green-400">Gol: ${player.Gf || 0}</span>
+                                <div class="text-sm">
+                                    <div class="flex gap-4 mt-1">
+                                        <span class="text-yellow-400">FM: ${player.Fm?.toFixed(1) || '0.0'}</span>
+                                        <span class="text-blue-400">Pv: ${player.Pv || 0}</span>
+                                    </div>
+                                    <div class="flex gap-4 mt-1">
+                                        <span class="${stat1Color}">${stat1}</span>
+                                        <span class="${stat2Color}">${stat2}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1426,11 +1415,117 @@ export const filterHistoricResults = () => {
 };
 
 // ===================================
+// TEAM OF THE SEASON
+// ===================================
+
+export async function renderTeamOfTheSeason() {
+    try {
+        const db = getFirestore();
+        
+        // Carica giocatori e loro statistiche
+        const playersSnapshot = await getDocs(collection(db, 'players'));
+        const statsSnapshot = await getDocs(collection(db, 'player_stats'));
+        
+        // Crea map per statistiche
+        const statsMap = new Map();
+        statsSnapshot.forEach(doc => {
+            const stats = doc.data();
+            const normalizedName = normalizeName(stats.playerName);
+            statsMap.set(normalizedName, stats);
+        });
+        
+        // Crea array di giocatori con statistiche (solo quelli in squadra)
+        const allPlayersWithStats = playersSnapshot.docs
+            .map(doc => {
+                const player = doc.data();
+                const normalizedName = normalizeName(player.playerName);
+                const stats = statsMap.get(normalizedName);
+                
+                return {
+                    name: player.playerName,
+                    team: player.team || 'No Team',
+                    role: player.role || player.R || (stats ? (stats.role || stats.R) : null),
+                    mv: stats ? (parseFloat(stats.mv) || 0) : 0,
+                    fm: stats ? (parseFloat(stats.fm) || 0) : 0,
+                    serieATeam: player.serieATeam || (stats ? stats.serieATeam : null),
+                    imageUrl: stats ? stats.imageUrl : null,
+                    cost: player.cost || 0
+                };
+            })
+            .filter(p => p.team && p.team !== 'Svincolato' && p.team !== 'No Team') // Solo giocatori in squadra
+            .filter(p => p.mv > 0); // Solo con media voto
+        
+        // Raggruppa per ruolo e ordina
+        const roleGroups = {
+            'P': [],
+            'D': [],
+            'C': [],
+            'A': []
+        };
+        
+        allPlayersWithStats.forEach(player => {
+            if (roleGroups[player.role]) {
+                roleGroups[player.role].push(player);
+            }
+        });
+        
+        // Ordina ogni ruolo per media voto descrescente e prendi i migliori
+        const formation = {
+            'P': roleGroups['P'].sort((a, b) => b.mv - a.mv).slice(0, 1),
+            'D': roleGroups['D'].sort((a, b) => b.mv - a.mv).slice(0, 4),
+            'C': roleGroups['C'].sort((a, b) => b.mv - a.mv).slice(0, 3),
+            'A': roleGroups['A'].sort((a, b) => b.mv - a.mv).slice(0, 3)
+        };
+        
+        // Renderizza il campo
+        renderTeamOfSeasonField(formation);
+        
+    } catch (error) {
+        console.error('Errore caricamento Team of the Season:', error);
+    }
+}
+
+function renderTeamOfSeasonField(formation) {
+    // Portiere
+    const goalkeeperContainer = document.getElementById('team-season-goalkeeper');
+    goalkeeperContainer.innerHTML = formation['P'].map(player => createPlayerCard(player)).join('');
+    
+    // Difensori
+    const defendersContainer = document.getElementById('team-season-defenders');
+    defendersContainer.innerHTML = formation['D'].map(player => createPlayerCard(player)).join('');
+    
+    // Centrocampisti
+    const midfieldersContainer = document.getElementById('team-season-midfielders');
+    midfieldersContainer.innerHTML = formation['C'].map(player => createPlayerCard(player)).join('');
+    
+    // Attaccanti
+    const forwardsContainer = document.getElementById('team-season-forwards');
+    forwardsContainer.innerHTML = formation['A'].map(player => createPlayerCard(player)).join('');
+}
+
+function createPlayerCard(player) {
+    const imageUrl = player.imageUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23666" width="100" height="100"/%3E%3Ccircle cx="50" cy="35" r="20" fill="%23999"/%3E%3Cpath d="M50 55 Q30 55 25 70 L75 70 Q70 55 50 55" fill="%23999"/%3E%3C/svg%3E';
+    
+    return `
+        <div class="flex flex-col items-center">
+            <div class="w-16 h-20 sm:w-20 sm:h-24 rounded-lg overflow-hidden border-2 border-yellow-300 shadow-lg bg-gray-800 flex items-center justify-center">
+                <img src="${imageUrl}" alt="${player.name}" class="w-full h-full object-cover" onerror="this.style.display='none'">
+            </div>
+            <div class="text-center mt-2 text-xs sm:text-sm">
+                <p class="font-bold text-white truncate max-w-16 sm:max-w-20">${player.name}</p>
+                <p class="text-yellow-300 font-semibold">${player.mv.toFixed(2)}</p>
+            </div>
+        </div>
+    `;
+}
+
+// ===================================
 // ESPORTAZIONI WINDOW
 // ===================================
 
 window.renderStandings = renderStandings;
 window.renderHistoricResults = renderHistoricResults;
+window.renderTeamOfTheSeason = renderTeamOfTheSeason;
 window.renderPlacedBets = renderPlacedBets;
 window.renderStatistics = renderStatistics;
 window.showTeamStats = showTeamStats;

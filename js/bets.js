@@ -662,34 +662,51 @@ export const renderBonusDeadlineCountdown = async (giornata) => {
 export const calculateTeamStats = (teamName, allResults) => {
     const homeMatches = allResults.filter(r => r.homeTeam === teamName);
     const awayMatches = allResults.filter(r => r.awayTeam === teamName);
-    const allMatches = [...homeMatches, ...awayMatches];
+    const allMatchesForTeam = [...homeMatches, ...awayMatches];
 
-    if (allMatches.length === 0) {
-        return {
-            homeWinRate: 0.35,
-            awayWinRate: 0.25,
-            overallWinRate: 0.30,
-            drawRate: 0.30,
-            points: 0,
-            matchesPlayed: 0
-        };
-    }
+    let wins = 0;
+    let draws = 0;
+    let losses = 0;
+    let goalsFor = 0;
+    let goalsAgainst = 0;
+    let fantasyPoints = 0;
 
-    let homeWins = homeMatches.filter(r => r.result === '1').length;
-    let homeDraws = homeMatches.filter(r => r.result === 'X').length;
-    let awayWins = awayMatches.filter(r => r.result === '2').length;
-    let awayDraws = awayMatches.filter(r => r.result === 'X').length;
-    let totalWins = homeWins + awayWins;
-    let totalDraws = homeDraws + awayDraws;
-    let totalPoints = (totalWins * 3) + totalDraws;
+    allMatchesForTeam.forEach(res => {
+        const isHome = res.homeTeam === teamName;
+        const [homeGoals, awayGoals] = (res.score && res.score !== 'N/A' && res.score !== '-') 
+            ? res.score.split('-').map(s => parseInt(s.trim(), 10) || 0)
+            : [0, 0];
+
+        if (isHome) {
+            goalsFor += homeGoals;
+            goalsAgainst += awayGoals;
+            if (res.result === '1') wins++;
+            else if (res.result === 'X') draws++;
+            else losses++;
+            if (res.homePoints) fantasyPoints += parseFloat(res.homePoints);
+        } else { // away team
+            goalsFor += awayGoals;
+            goalsAgainst += homeGoals;
+            if (res.result === '2') wins++;
+            else if (res.result === 'X') draws++;
+            else losses++;
+            if (res.awayPoints) fantasyPoints += parseFloat(res.awayPoints);
+        }
+    });
+    
+    const points = (wins * 3) + draws;
 
     return {
-        homeWinRate: homeMatches.length > 0 ? homeWins / homeMatches.length : 0.35,
-        awayWinRate: awayMatches.length > 0 ? awayWins / awayMatches.length : 0.25,
-        overallWinRate: allMatches.length > 0 ? totalWins / allMatches.length : 0.30,
-        drawRate: allMatches.length > 0 ? totalDraws / allMatches.length : 0.25,
-        points: totalPoints,
-        matchesPlayed: allMatches.length
+        team: teamName,
+        played: allMatchesForTeam.length,
+        wins: wins,
+        draws: draws,
+        losses: losses,
+        goalsFor: goalsFor,
+        goalsAgainst: goalsAgainst,
+        goalDifference: goalsFor - goalsAgainst,
+        points: points,
+        fantasyPoints: fantasyPoints
     };
 };
 
@@ -1211,7 +1228,6 @@ export const setupAdminBetsListener = (giornataNum, allUsers) => {
  */
 export const calculateStandings = () => {
     const allResults = getAllResults ? getAllResults() : [];
-    const standings = [];
     const teamsSet = new Set();
     
     // Raccogli tutte le squadre uniche
@@ -1221,25 +1237,14 @@ export const calculateStandings = () => {
     });
     
     // Calcola statistiche per ogni squadra
-    teamsSet.forEach(teamName => {
-        const stats = calculateTeamStats(teamName, allResults);
-        standings.push({
-            team: teamName,
-            points: stats.points,
-            played: stats.matchesPlayed,
-            wins: stats.wins,
-            draws: stats.draws,
-            losses: stats.losses,
-            goalsFor: stats.goalsFor,
-            goalsAgainst: stats.goalsAgainst,
-            goalDifference: stats.goalDifference,
-            fantasyPoints: stats.fantasyPoints || 0
-        });
+    const standings = Array.from(teamsSet).map(teamName => {
+        return calculateTeamStats(teamName, allResults);
     });
     
-    // Ordina per punti (decrescente), poi differenza reti, poi gol fatti
+    // Ordina per punti (decrescente), poi fantapunti, poi differenza reti, poi gol fatti
     standings.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
+        if (b.fantasyPoints !== a.fantasyPoints) return b.fantasyPoints - a.fantasyPoints;
         if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
         return b.goalsFor - a.goalsFor;
     });
