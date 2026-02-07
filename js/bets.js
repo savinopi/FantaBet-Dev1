@@ -12,7 +12,8 @@ import {
     setDoc,
     doc, 
     onSnapshot,
-    getGiornataBetsCollectionRef
+    getGiornataBetsCollectionRef,
+    getFormationsCollectionRef
 } from './firebase-config.js';
 import { getTeamLogo } from './config.js';
 import { messageBox } from './utils.js';
@@ -43,12 +44,60 @@ let checkPendingBonusRequests;
 let renderAdminBetsList;
 let getAllResults;
 
+// Cache formazioni per calcolo fantapunti
+let formationsCache = null;
+let lastFormationsLoadTime = null;
+
 // Setter per dipendenze esterne
 export const setBetsDependencies = (deps) => {
     getGiornataDeadline = deps.getGiornataDeadline;
     isDeadlinePassed = deps.isDeadlinePassed;
     checkPendingBonusRequests = deps.checkPendingBonusRequests;
     renderAdminBetsList = deps.renderAdminBetsList;
+    getAllResults = deps.getAllResults;
+};
+
+/**
+ * Carica le formazioni in cache con refresh ogni 60 secondi
+ */
+export const loadFormationsCache = async (forceReload = false) => {
+    if (formationsCache && !forceReload && lastFormationsLoadTime && (Date.now() - lastFormationsLoadTime < 60000)) {
+        return formationsCache;
+    }
+    
+    try {
+        const snapshot = await getDocs(getFormationsCollectionRef());
+        formationsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        lastFormationsLoadTime = Date.now();
+        console.log(`✅ Caricate ${formationsCache.length} formazioni per il calcolo della classifica`);
+        return formationsCache;
+    } catch (error) {
+        console.error('Errore caricamento formazioni:', error);
+        return formationsCache || [];
+    }
+};
+
+/**
+ * Ottieni i fantapunti totali di una squadra in una giornata specifica
+ * @param {string} teamName - Nome della squadra
+ * @param {number} giornata - Numero della giornata
+ * @returns {number} - Somma dei fantavoto
+ */
+const getTeamFantapuntiForGiornata = (teamName, giornata) => {
+    if (!formationsCache || formationsCache.length === 0) return 0;
+    
+    const teamPlayers = formationsCache.filter(f => 
+        f.squadra === teamName && f.giornata === giornata
+    );
+    
+    let total = 0;
+    teamPlayers.forEach(player => {
+        if (player.fantavoto && !isNaN(player.fantavoto)) {
+            total += parseFloat(player.fantavoto);
+        }
+    });
+    
+    return total;
 };
 
 /**
@@ -669,11 +718,11 @@ export const calculateTeamStats = (teamName, allResults) => {
     let losses = 0;
     let goalsFor = 0;
     let goalsAgainst = 0;
-    let fantasyPoints = 0;
+    let fantasyPoints = 0; // Fantapunti dal calendario (homePoints/awayPoints)
 
     allMatchesForTeam.forEach(res => {
         const isHome = res.homeTeam === teamName;
-        const [homeGoals, awayGoals] = (res.score && res.score !== 'N/A' && res.score !== '-') 
+        const [homeGoals, awayGoals] = (res.score && res.score !== 'N/A' && res.score !== '-')
             ? res.score.split('-').map(s => parseInt(s.trim(), 10) || 0)
             : [0, 0];
 
@@ -693,7 +742,7 @@ export const calculateTeamStats = (teamName, allResults) => {
             if (res.awayPoints) fantasyPoints += parseFloat(res.awayPoints);
         }
     });
-    
+
     const points = (wins * 3) + draws;
 
     return {

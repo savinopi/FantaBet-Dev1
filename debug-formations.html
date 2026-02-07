@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Formazioni - FantaBet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        pre {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-size: 0.875rem;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="min-h-screen p-6">
+        <div class="max-w-6xl mx-auto">
+            <h1 class="text-4xl font-bold mb-6 text-blue-400">🔍 Debug Formazioni</h1>
+            
+            <div id="loading" class="bg-blue-900/30 border border-blue-600 rounded-lg p-4 mb-6">
+                <p class="text-blue-300">⏳ Caricamento dati...</p>
+            </div>
+
+            <div id="results" class="hidden space-y-6">
+                <!-- Analisi LIBERTAS -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                    <h2 class="text-2xl font-bold text-yellow-400 mb-4">📊 Analisi LIBERTAS</h2>
+                    <pre id="libertas-result"></pre>
+                </div>
+
+                <!-- Analisi Completa -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                    <h2 class="text-2xl font-bold text-green-400 mb-4">📋 Analisi Completa</h2>
+                    <pre id="complete-result"></pre>
+                </div>
+            </div>
+
+            <div id="error" class="hidden bg-red-900/30 border border-red-600 rounded-lg p-4">
+                <p class="text-red-300" id="error-message"></p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import {
+            initializeApp
+        } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-app.js";
+        import {
+            getFirestore,
+            collection,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9FAyUKCHkP9v_gEWnh4kLDFjyKMKWw74",
+            authDomain: "fantabet-op.firebaseapp.com",
+            projectId: "fantabet-op",
+            storageBucket: "fantabet-op.firebasestorage.app",
+            messagingSenderId: "1042496289193",
+            appId: "1:1042496289193:web:9e62956ef2da506b80ecb8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function analyzeFormations() {
+            try {
+                const libertasResult = await analyzeSquadraDebug("LIBERTAS");
+                const completeResult = await analyzeAllFormations();
+
+                document.getElementById('libertas-result').textContent = formatOutput(libertasResult);
+                document.getElementById('complete-result').textContent = formatOutput(completeResult);
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('results').classList.remove('hidden');
+            } catch (error) {
+                console.error('Errore:', error);
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('error').classList.remove('hidden');
+                document.getElementById('error-message').textContent = `Errore: ${error.message}`;
+            }
+        }
+
+        async function analyzeSquadraDebug(squadraNome) {
+            const formationsRef = collection(db, 'fantabet_formations');
+            const snapshot = await getDocs(formationsRef);
+            
+            const formations = snapshot.docs
+                .map(doc => doc.data())
+                .filter(f => f.squadra === squadraNome);
+
+            if (formations.length === 0) {
+                return `❌ Nessuna formazione trovata per ${squadraNome}`;
+            }
+
+            const byGiornata = {};
+            formations.forEach(f => {
+                const g = parseInt(f.giornata);
+                if (!byGiornata[g]) byGiornata[g] = [];
+                byGiornata[g].push(f);
+            });
+
+            const giornate = Object.keys(byGiornata).map(g => parseInt(g)).sort((a, b) => a - b);
+            
+            const giornatemancanti = [];
+            for (let g = 1; g <= 21; g++) {
+                if (!byGiornata[g]) {
+                    giornatemancanti.push(g);
+                }
+            }
+
+            let output = `🔍 Analisi dettagliata di ${squadraNome}\n`;
+            output += `✓ Total formations: ${formations.length}\n\n`;
+            output += `📅 Giornate caricate: ${giornate.join(', ')}\n\n`;
+            output += `📊 Dettagli per giornata:\n`;
+            
+            giornate.forEach(g => {
+                const players = byGiornata[g];
+                const titolari = players.filter(p => p.sezione === 'TITOLARE').length;
+                const panchina = players.filter(p => p.sezione === 'PANCHINA').length;
+                output += `  Giornata ${g}: ${players.length} giocatori (${titolari} titolari, ${panchina} panchina)\n`;
+            });
+
+            output += `\n⚠️ Giornate mancanti (1-21): ${giornatemancanti.length > 0 ? giornatemancanti.join(', ') : 'NESSUNA'}\n`;
+
+            return output;
+        }
+
+        async function analyzeAllFormations() {
+            const formationsRef = collection(db, 'fantabet_formations');
+            const snapshot = await getDocs(formationsRef);
+            const formations = snapshot.docs.map(doc => doc.data());
+
+            const byGiornataSquadra = {};
+            const giornateSet = new Set();
+            const squadreSet = new Set();
+
+            formations.forEach(f => {
+                const key = `${f.giornata}_${f.squadra}`;
+                if (!byGiornataSquadra[key]) byGiornataSquadra[key] = [];
+                byGiornataSquadra[key].push(f);
+                giornateSet.add(parseInt(f.giornata));
+                squadreSet.add(f.squadra);
+            });
+
+            const giornate = Array.from(giornateSet).sort((a, b) => a - b);
+            const squadre = Array.from(squadreSet).sort();
+
+            let output = `📊 Total formations found: ${formations.length}\n\n`;
+            output += `📅 Giornate caricate: ${giornate.length}\n`;
+            output += `Giornate: ${giornate.join(', ')}\n\n`;
+            output += `🏟️ Squadre caricate: ${squadre.length}\n`;
+            output += `Squadre:\n${squadre.map(s => `  - ${s}`).join('\n')}\n\n`;
+
+            output += `🎯 ANALISI PER SQUADRA:\n`;
+            squadre.forEach(s => {
+                const giornateConDati = [];
+                giornate.forEach(g => {
+                    const key = `${g}_${s}`;
+                    if (byGiornataSquadra[key]) {
+                        giornateConDati.push(g);
+                    }
+                });
+                const percentuale = ((giornateConDati.length / giornate.length) * 100).toFixed(1);
+                output += `${s}: ${giornateConDati.length}/${giornate.length} giornate (${percentuale}%) - Giornate: ${giornateConDati.join(', ')}\n`;
+            });
+
+            output += `\n⚠️ GIORNATE MANCANTI PER SQUADRA:\n`;
+            squadre.forEach(s => {
+                const giornateConDati = new Set();
+                giornate.forEach(g => {
+                    const key = `${g}_${s}`;
+                    if (byGiornataSquadra[key]) {
+                        giornateConDati.add(g);
+                    }
+                });
+                const giornatemancanti = giornate.filter(g => !giornateConDati.has(g));
+                if (giornatemancanti.length > 0) {
+                    output += `${s}: Mancano giornate ${giornatemancanti.join(', ')}\n`;
+                }
+            });
+
+            output += `\n📈 RIEPILOGO:\n`;
+            const totalCombinazioni = giornate.length * squadre.length;
+            const combinazioniCaricate = Object.keys(byGiornataSquadra).length;
+            output += `Combinazioni giornata-squadra caricate: ${combinazioniCaricate}/${totalCombinazioni} (${((combinazioniCaricate/totalCombinazioni)*100).toFixed(1)}%)\n`;
+
+            return output;
+        }
+
+        function formatOutput(text) {
+            return text;
+        }
+
+        // Esegui l'analisi al caricamento
+        analyzeFormations();
+    </script>
+</body>
+</html>

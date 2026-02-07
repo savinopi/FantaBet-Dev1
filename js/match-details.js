@@ -11,6 +11,7 @@ import {
     getSquadBonusesCollectionRef
 } from './firebase-config.js';
 import { getTeamLogo } from './config.js';
+import { calculateDeployedFormation, isValidFormation } from './coach-stats.js';
 
 /**
  * Mostra il dettaglio del match con le formazioni caricate
@@ -142,10 +143,6 @@ const renderMatchDetailsContent = async (matchData, homeFormations, awayFormatio
         titleEl.textContent = `${matchData.homeTeam} vs ${matchData.awayTeam}`;
     }
 
-    // Raggruppa giocatori per sezione (titolare/panchina)
-    const homeGrouped = groupFormationsBySection(homeFormations);
-    const awayGrouped = groupFormationsBySection(awayFormations);
-
     // Debug: nessun dato trovato
     if (homeFormations.length === 0 && awayFormations.length === 0) {
         return `
@@ -184,13 +181,13 @@ const renderMatchDetailsContent = async (matchData, homeFormations, awayFormatio
             <!-- Casa -->
             <div class="space-y-4">
                 <h3 class="text-lg font-bold text-blue-400 border-b border-blue-500/30 pb-2">${matchData.homeTeam}</h3>
-                ${renderFormationSection(homeGrouped, matchData.homeTeam)}
+                ${renderFormationSection(homeFormations)}
                 ${await renderTeamBonusSection(matchData.giornata, matchData.homeTeam)}
             </div>
             <!-- Ospiti -->
             <div class="space-y-4">
                 <h3 class="text-lg font-bold text-blue-400 border-b border-blue-500/30 pb-2">${matchData.awayTeam}</h3>
-                ${renderFormationSection(awayGrouped, matchData.awayTeam)}
+                ${renderFormationSection(awayFormations)}
                 ${await renderTeamBonusSection(matchData.giornata, matchData.awayTeam)}
             </div>
         </div>
@@ -278,62 +275,62 @@ const renderTeamBonusSection = async (giornata, squadra) => {
 };
 
 /**
- * Raggruppa le formazioni per sezione (titolare/panchina)
+ * Renderizza la formazione schierata usando la logica Hybrid
+ * Mostra i 11 titolari con indicazione di chi è stato sostituito
+ * Poi mostra il resto della panchina
  */
-const groupFormationsBySection = (formations) => {
-    return formations.reduce((acc, formation) => {
-        const section = formation.sezione || 'SCONOSCIUTO';
-        if (!acc[section]) acc[section] = [];
-        acc[section].push(formation);
-        return acc;
-    }, {});
-};
-
-/**
- * Renderizza una sezione di formazione (titolari o panchina)
- */
-const renderFormationSection = (groupedFormations, teamName) => {
+const renderFormationSection = (formations) => {
+    if (!formations || formations.length === 0) {
+        return '<p class="text-gray-500 text-sm">Nessun giocatore caricato</p>';
+    }
+    
+    // Usa l'algoritmo Hybrid per calcolare la formazione schierata
+    const deployed = calculateDeployedFormation(formations);
+    const deployedSet = new Set(deployed.players.map(p => p.calciatore));
+    
     // Ordine dei ruoli
     const roleOrder = { 'P': 1, 'D': 2, 'C': 3, 'A': 4 };
     
+    // Ordina i 11 schierati per ruolo
+    const sortedDeployed = [...deployed.players].sort((a, b) => {
+        const orderA = roleOrder[a.ruolo] || 99;
+        const orderB = roleOrder[b.ruolo] || 99;
+        return orderA - orderB;
+    });
+    
     let html = '';
-
-    // Titolari
-    if (groupedFormations['TITOLARE'] && groupedFormations['TITOLARE'].length > 0) {
-        // Ordina per ruolo
-        const sortedTitolari = groupedFormations['TITOLARE'].sort((a, b) => {
-            const orderA = roleOrder[a.ruolo] || 99;
-            const orderB = roleOrder[b.ruolo] || 99;
-            return orderA - orderB;
-        });
-
-        html += `
-            <div class="bg-gray-800 rounded-lg p-3">
-                <h4 class="text-sm font-bold text-green-400 mb-3">Titolari</h4>
-                <div class="text-xs text-gray-400 mb-2 flex gap-2 px-2">
-                    <span class="flex-1">Giocatore</span>
-                    <span class="w-8 text-center">R</span>
-                    <span class="w-12 text-right">V</span>
-                    <span class="w-12 text-right">FV</span>
-                </div>
-                <div class="space-y-2">
-        `;
-        
-        sortedTitolari.forEach(formation => {
-            html += renderPlayerRow(formation);
-        });
-
-        html += `
-                </div>
+    
+    // Sezione Formazione Schierata (i 11 giocatori)
+    html += `
+        <div class="bg-gray-800 rounded-lg p-3 border-l-4 border-green-500">
+            <h4 class="text-sm font-bold text-green-400 mb-3">
+                Formazione Schierata (${deployed.formation})
+            </h4>
+            <div class="text-xs text-gray-400 mb-2 flex gap-2 px-2">
+                <span class="flex-1">Giocatore</span>
+                <span class="w-8 text-center">R</span>
+                <span class="w-12 text-right">V</span>
+                <span class="w-12 text-right">FV</span>
+                <span class="w-16 text-right">Stato</span>
             </div>
-        `;
-    }
-
-    // Panchina
-    if (groupedFormations['PANCHINA'] && groupedFormations['PANCHINA'].length > 0) {
+            <div class="space-y-2">
+    `;
+    
+    sortedDeployed.forEach(player => {
+        html += renderPlayerRowWithStatus(player, player.isSubstitute);
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    // Sezione Panchina (giocatori non schierati)
+    const benchPlayers = formations.filter(f => f.sezione === 'PANCHINA' && !deployedSet.has(f.calciatore));
+    
+    if (benchPlayers.length > 0) {
         // Ordina per: prima giocatori con voto, poi per ruolo
-        const sortedPanchina = groupedFormations['PANCHINA'].sort((a, b) => {
-            // Giocatori con voto prima
+        const sortedBench = benchPlayers.sort((a, b) => {
             const hasVotoA = a.voto_base && parseFloat(a.voto_base) > 0 ? 0 : 1;
             const hasVotoB = b.voto_base && parseFloat(b.voto_base) > 0 ? 0 : 1;
             
@@ -341,15 +338,14 @@ const renderFormationSection = (groupedFormations, teamName) => {
                 return hasVotoA - hasVotoB;
             }
             
-            // Se stesso voto status, ordina per ruolo
             const orderA = roleOrder[a.ruolo] || 99;
             const orderB = roleOrder[b.ruolo] || 99;
             return orderA - orderB;
         });
-
+        
         html += `
-            <div class="bg-gray-800 rounded-lg p-3 opacity-75">
-                <h4 class="text-sm font-bold text-gray-400 mb-3">Panchina</h4>
+            <div class="bg-gray-800 rounded-lg p-3 opacity-60">
+                <h4 class="text-sm font-bold text-gray-400 mb-3">Panchina (Non Schierata)</h4>
                 <div class="text-xs text-gray-400 mb-2 flex gap-2 px-2">
                     <span class="flex-1">Giocatore</span>
                     <span class="w-8 text-center">R</span>
@@ -359,17 +355,56 @@ const renderFormationSection = (groupedFormations, teamName) => {
                 <div class="space-y-2">
         `;
         
-        sortedPanchina.forEach(formation => {
-            html += renderPlayerRow(formation);
+        sortedBench.forEach(player => {
+            html += renderPlayerRow(player);
         });
-
+        
         html += `
                 </div>
             </div>
         `;
     }
+    
+    return html;
+};
 
-    return html || '<p class="text-gray-500 text-sm">Nessun giocatore caricato</p>';
+/**
+ * Renderizza una riga di giocatore con indicazione dello stato (titolare/subentrato)
+ */
+const renderPlayerRowWithStatus = (formation, isSubstitute) => {
+    const voto_base = formation.voto_base !== null && formation.voto_base !== undefined ? parseFloat(formation.voto_base).toFixed(1) : '-';
+    const fantavoto = formation.fantavoto !== null && formation.fantavoto !== undefined ? parseFloat(formation.fantavoto).toFixed(1) : '-';
+    
+    // Highlight giocatori che hanno giocato
+    const hasPlayedClass = formation.ha_giocato ? 'text-white' : 'text-gray-500';
+    
+    // Indicatore status
+    let statusBadge = '';
+    if (isSubstitute) {
+        statusBadge = '<span class="bg-yellow-600/50 text-yellow-300 text-xs px-2 py-1 rounded">Sub</span>';
+    } else {
+        statusBadge = '<span class="bg-green-600/50 text-green-300 text-xs px-2 py-1 rounded">Titolare</span>';
+    }
+    
+    return `
+        <div class="text-sm bg-gray-700/50 rounded px-3 py-2 flex gap-2 items-center">
+            <div class="flex-1 min-w-0">
+                <span class="font-medium ${hasPlayedClass}">${formation.calciatore}</span>
+            </div>
+            <div class="w-8 text-center">
+                <span class="text-xs text-gray-400">${formation.ruolo}</span>
+            </div>
+            <div class="w-12 text-right">
+                <span class="text-blue-300 font-bold">${voto_base}</span>
+            </div>
+            <div class="w-12 text-right">
+                <span class="text-blue-300 font-bold">${fantavoto}</span>
+            </div>
+            <div class="w-16 text-right">
+                ${statusBadge}
+            </div>
+        </div>
+    `;
 };
 
 /**

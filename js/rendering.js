@@ -250,7 +250,7 @@ export const renderHistoricResults = (results, giornateData = {}) => {
 export const renderStandings = (sortColumn = null) => {
     const container = document.getElementById('standings-container');
     if (!container) return;
-    
+
     const results = state.allResults;
     if (!results || results.length === 0) {
         container.innerHTML = '<p class="text-sm sm:text-base text-gray-500 text-center py-4 px-4">Carica i risultati per visualizzare la classifica</p>';

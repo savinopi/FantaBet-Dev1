@@ -36,6 +36,10 @@ let selectedCalendarXlsxFile = null; // File XLSX calendario
 let selectedSquadsXlsxFile = null; // File XLSX rose
 let selectedFormationsXlsxFile = null; // File XLSX formazioni
 
+// Coda file formazioni per upload multiplo
+let formationsXlsxQueue = [];
+let formationsQueueProcessing = false;
+
 // Dipendenze esterne da settare
 let renderHistoricResults = null;
 let processCsvContent = null;
@@ -938,7 +942,8 @@ export const processSquadsXlsxFile = async () => {
             playerIdMap.set(normalizedName, stat.playerId);
         });
         
-        console.log(`IDs caricati: ${playerIdMap.size} giocatori trovati`);
+        console.log(`[DEBUG ROSE] IDs caricati: ${playerIdMap.size} giocatori trovati`);
+        console.log('[DEBUG ROSE] Primi 10 nomi caricati:', Array.from(playerIdMap.keys()).slice(0, 10));
         
         updateProgress(20, 'Parsing rose...', null, null, 'squads-xlsx-progress');
         
@@ -987,7 +992,7 @@ export const processSquadsXlsxFile = async () => {
                 const cost = parseFloat(row[3]) || 0;
                 
                 if (playerName) {
-                    const normalizedName = playerName.toLowerCase();
+                    const normalizedName = playerName.trim().toLowerCase();
                     const playerId = playerIdMap.get(normalizedName);
                     
                     const playerData = {
@@ -1040,7 +1045,7 @@ export const processSquadsXlsxFile = async () => {
                 const cost = parseFloat(row[8]) || 0;
                 
                 if (playerName) {
-                    const normalizedName = playerName.toLowerCase();
+                    const normalizedName = playerName.trim().toLowerCase();
                     const playerId = playerIdMap.get(normalizedName);
                     
                     const playerData = {
@@ -1079,11 +1084,27 @@ export const processSquadsXlsxFile = async () => {
             squads.delete(currentSquadRight);
         }
         
-        console.log('Rose parsate:', { 
+        console.log('[DEBUG ROSE] Rose parsate:', { 
             totaleGiocatori: players.length, 
             numeroSquadre: squads.size,
             giocatoriConId: players.filter(p => p.playerId).length
         });
+        
+        // Debug: Mostra i giocatori di ogni squadra
+        for (const [squadName, squadPlayers] of squads.entries()) {
+            console.log(`[DEBUG ROSE] Squadra "${squadName}": ${squadPlayers.length} giocatori`);
+            if (squadPlayers.length > 0) {
+                console.log(`  Primi giocatori: ${squadPlayers.slice(0, 3).map(p => p.playerName).join(', ')}`);
+            }
+        }
+        
+        // Debug: Controlla se Moreo è presente
+        const moreoPlayer = players.find(p => p.playerName.toLowerCase().includes('moreo'));
+        if (moreoPlayer) {
+            console.log(`[DEBUG ROSE] ✅ MOREO TROVATO nella squadra: ${moreoPlayer.squadName}`, moreoPlayer);
+        } else {
+            console.log('[DEBUG ROSE] ⚠️ MOREO NON TROVATO nel file Excel!');
+        }
         
         updateProgress(40, 'Cancellazione rose precedenti...', null, null, 'squads-xlsx-progress');
         
@@ -1100,6 +1121,7 @@ export const processSquadsXlsxFile = async () => {
         // Salva i nuovi giocatori
         let savedCount = 0;
         for (const player of players) {
+            console.log(`[DEBUG ROSE] Salvando giocatore: ${player.playerName} -> Squadra: ${player.squadName}`);
             await addDoc(playersCollection, player);
             savedCount++;
             
@@ -1140,6 +1162,7 @@ export const processSquadsXlsxFile = async () => {
         // Mostra riepilogo
         renderSquadsData(squads);
         
+        console.log('[DEBUG ROSE] ✅ Caricamento completato! Squadre salvate in Firebase:', Array.from(squads.keys()));
         messageBox(`Rose caricate da Excel!\n\n✅ ${squads.size} squadre\n✅ ${players.length} giocatori totali\n✅ ${players.filter(p => p.playerId).length} con ID statistiche`);
         
         // Reset UI dopo 2 secondi
@@ -1242,7 +1265,10 @@ export const processStatsFile = async () => {
             playerToSquadMap.set(normalizedName, player.squadName);
         });
         
-        console.log(`Rose caricate: ${playerToSquadMap.size} calciatori trovati`);
+        console.log(`[DEBUG STATS] Rose caricate da Firebase: ${playerToSquadMap.size} calciatori trovati`);
+        console.log('[DEBUG STATS] Primi 10 calciatori caricati dalle rose:', Array.from(playerToSquadMap.entries()).slice(0, 10));
+        const moreoInRose = playerToSquadMap.get('moreo');
+        console.log(`[DEBUG STATS] Moreo nelle rose Firebase: ${moreoInRose ? 'SÌ (' + moreoInRose + ')' : 'NO'}`);
         
         // Parsing del CSV (salta l'header)
         let validLines = 0;
@@ -1264,6 +1290,11 @@ export const processStatsFile = async () => {
             const playerName = columns[2].trim();
             const normalizedName = playerName.toLowerCase();
             const fantaSquad = playerToSquadMap.get(normalizedName) || 'SVINCOLATI';
+            
+            // Debug per Moreo
+            if (playerName.toLowerCase().includes('moreo')) {
+                console.log(`[DEBUG STATS] MOREO trovato nelle statistiche CSV: fantaSquad=${fantaSquad}`, {playerName, normalizedName});
+            }
             
             const statData = {
                 playerId: columns[0],
@@ -1444,7 +1475,10 @@ export const processStatsXlsxFile = async () => {
             playerToSquadMap.set(normalizedName, player.squadName);
         });
         
-        console.log(`Rose caricate: ${playerToSquadMap.size} calciatori trovati`);
+        console.log(`[DEBUG STATS XLSX] Rose caricate da Firebase: ${playerToSquadMap.size} calciatori trovati`);
+        console.log('[DEBUG STATS XLSX] Primi 10 calciatori:', Array.from(playerToSquadMap.entries()).slice(0, 10));
+        const moreoInRose = playerToSquadMap.get('moreo');
+        console.log(`[DEBUG STATS XLSX] Moreo nelle rose Firebase: ${moreoInRose ? 'SÌ (' + moreoInRose + ')' : 'NO'}`);
         
         // Parsing del file Excel
         // Riga 0 = Titolo (ignorata), Riga 1 = Intestazioni (ignorata), Dati da Riga 2+
@@ -1473,6 +1507,11 @@ export const processStatsXlsxFile = async () => {
             
             const normalizedName = playerName.toLowerCase();
             const fantaSquad = playerToSquadMap.get(normalizedName) || 'SVINCOLATI';
+            
+            // Debug per Moreo
+            if (playerName.toLowerCase().includes('moreo')) {
+                console.log(`[DEBUG STATS XLSX] MOREO trovato nelle statistiche XLSX: fantaSquad=${fantaSquad}`, {playerName, normalizedName});
+            }
             
             // Mappatura colonne (ignorando colonna C=Rm)
             const statData = {
@@ -1679,6 +1718,7 @@ export const processFormationsFile = async () => {
         const giornateSet = new Set();
         const squadreSet = new Set();
         let processedLines = 0;
+        const ordinePerSquadraCSV = {}; // Per preservare l'ordine dei calciatori
 
         // Salta header
         for (let i = 1; i < lines.length; i++) {
@@ -1738,6 +1778,10 @@ export const processFormationsFile = async () => {
 
             squadreSet.add(squadra);
 
+            // Incrementa l'ordine per questa squadra
+            if (!ordinePerSquadraCSV[squadra]) ordinePerSquadraCSV[squadra] = 0;
+            ordinePerSquadraCSV[squadra]++;
+
             const formazione_data = {
                 giornata,
                 matchId,
@@ -1753,6 +1797,7 @@ export const processFormationsFile = async () => {
                 fantavoto,
                 ha_giocato: ha_giocato === 1,
                 fantavoto_in_verde,
+                ordine: ordinePerSquadraCSV[squadra],
                 record_tipo,
                 // Metadati
                 timestamp: new Date().toISOString(),
@@ -1772,9 +1817,31 @@ export const processFormationsFile = async () => {
             throw new Error('Nessun dato valido trovato nel CSV.');
         }
 
-        console.log(`Formazioni parsate: ${formazioni.length} record`, {
+        console.log(`✅ Formazioni parsate: ${formazioni.length} record`, {
             giornate: Array.from(giornateSet).length,
-            squadre: Array.from(squadreSet).length
+            squadre: Array.from(squadreSet).length,
+            giornateList: Array.from(giornateSet).sort((a, b) => a - b),
+            squadreList: Array.from(squadreSet).sort()
+        });
+        
+        // DEBUG: Stampa dettagli per giornata e squadra
+        const byGiornataSquadra = {};
+        formazioni.forEach(f => {
+            const key = `${f.giornata}_${f.squadra}`;
+            if (!byGiornataSquadra[key]) byGiornataSquadra[key] = 0;
+            byGiornataSquadra[key]++;
+        });
+        
+        console.log(`📋 Dettagli per giornata-squadra:`, byGiornataSquadra);
+        
+        Array.from(giornateSet).sort((a, b) => a - b).forEach(g => {
+            console.log(`  Giornata ${g}:`);
+            Array.from(squadreSet).sort().forEach(s => {
+                const count = byGiornataSquadra[`${g}_${s}`] || 0;
+                if (count > 0) {
+                    console.log(`    - ${s}: ${count} giocatori`);
+                }
+            });
         });
 
         updateProgress(75, 'Salvataggio dati in Firestore...');
@@ -1795,15 +1862,23 @@ export const processFormationsFile = async () => {
 
         // Salva nuovi documenti
         let savedCount = 0;
+        const savedByGiornataSquadra = {};
         for (const formazione of formazioni) {
             await addDoc(formationsCollection, formazione);
             savedCount++;
+            
+            // Traccia il salvataggio
+            const key = `${formazione.giornata}_${formazione.squadra}`;
+            if (!savedByGiornataSquadra[key]) savedByGiornataSquadra[key] = 0;
+            savedByGiornataSquadra[key]++;
 
             if (savedCount % 50 === 0) {
                 const progress = 75 + (savedCount / formazioni.length) * 15;
                 updateProgress(progress, `Salvati ${savedCount}/${formazioni.length} record...`);
             }
         }
+        
+        console.log(`✅ ${savedCount}/${formazioni.length} record salvati in Firestore`, savedByGiornataSquadra);
 
         // Salva i bonus
         if (bonuses.length > 0) {
@@ -1828,6 +1903,20 @@ export const processFormationsFile = async () => {
         }
 
         updateProgress(100, 'Completato!');
+
+        // Aggiorna la cache delle formazioni e renderizza la classifica
+        const { loadFormationsCache } = await import('./bets.js');
+        await loadFormationsCache(true); // Force reload
+        
+        // Ri-renderizza la classifica se visibile
+        const { renderStandings } = await import('./rendering.js');
+        if (window.renderStandings) {
+            try {
+                await window.renderStandings();
+            } catch (e) {
+                console.warn('Classifica non aggiornabile (potrebbe non essere caricata):', e.message);
+            }
+        }
 
         // Mostra riepilogo
         renderFormationsData(formazioni, giornateSet, squadreSet);
@@ -1858,6 +1947,10 @@ export const processFormationsFile = async () => {
 const renderFormationsData = (formazioni, giornateSet, squadreSet) => {
     const container = document.getElementById('formations-data-container');
     if (!container) return;
+    
+    console.log(`🎯 Rendering formazioni - totali: ${formazioni.length}`);
+    console.log(`   Giornate: ${Array.from(giornateSet).sort((a, b) => a - b).join(', ')}`);
+    console.log(`   Squadre: ${Array.from(squadreSet).sort().join(', ')}`);
 
     // Raggruppa per giornata e squadra
     const datiGiornate = new Map();
@@ -1919,68 +2012,647 @@ const renderFormationsData = (formazioni, giornateSet, squadreSet) => {
     container.innerHTML = html;
 };
 
-// ==================== FORMAZIONI DA EXCEL (XLSX) ====================
+// ==================== FORMAZIONI DA EXCEL (XLSX) - UPLOAD MULTIPLO ====================
 
 /**
- * Apre il dialog per selezionare il file Excel delle formazioni
+ * Apre il dialog per selezionare i file Excel delle formazioni (multipli)
  */
 export const triggerFormationsXlsxFileInput = () => {
     document.getElementById('formations-xlsx-file-input').click();
 };
 
 /**
- * Gestisce la selezione del file Excel delle formazioni
+ * Aggiorna la UI della coda file formazioni
  */
-export const handleFormationsXlsxFileSelect = () => {
-    const fileInput = document.getElementById('formations-xlsx-file-input');
-    const fileNameDisplay = document.getElementById('formations-xlsx-file-name-display');
+const updateFormationsQueueUI = () => {
+    const queueContainer = document.getElementById('formations-xlsx-queue-container');
+    const queueList = document.getElementById('formations-xlsx-queue-list');
+    const queueCount = document.getElementById('formations-xlsx-queue-count');
     const uploadButton = document.getElementById('upload-formations-xlsx-button');
+    const clearButton = document.getElementById('clear-formations-queue-button');
     
-    if (fileInput.files.length > 0) {
-        selectedFormationsXlsxFile = fileInput.files[0];
-        fileNameDisplay.textContent = selectedFormationsXlsxFile.name;
-        uploadButton.disabled = false;
-        uploadButton.classList.remove('btn-secondary');
-        uploadButton.classList.add('btn-primary');
-    } else {
-        selectedFormationsXlsxFile = null;
-        fileNameDisplay.textContent = 'Nessun file selezionato.';
+    if (formationsXlsxQueue.length === 0) {
+        queueContainer?.classList.add('hidden');
+        clearButton?.classList.add('hidden');
         uploadButton.disabled = true;
         uploadButton.classList.remove('btn-primary');
         uploadButton.classList.add('btn-secondary');
-    }
-};
-
-/**
- * Conferma il caricamento delle formazioni da Excel
- */
-export const confirmFormationsXlsxUpload = () => {
-    if (!selectedFormationsXlsxFile) {
-        messageBox('Seleziona un file Excel prima di procedere.');
         return;
     }
     
-    if (confirm(`Confermi il caricamento delle formazioni dal file "${selectedFormationsXlsxFile.name}"?\n\nATTENZIONE: Le formazioni precedenti per questa giornata verranno sovrascritte.`)) {
-        processFormationsXlsxFile();
+    queueContainer?.classList.remove('hidden');
+    clearButton?.classList.remove('hidden');
+    queueCount.textContent = formationsXlsxQueue.length;
+    
+    // Genera lista file
+    queueList.innerHTML = formationsXlsxQueue.map((file, index) => `
+        <li class="flex items-center justify-between gap-2 text-sm py-1 px-2 rounded ${file.status === 'completed' ? 'bg-green-900/30' : file.status === 'processing' ? 'bg-blue-900/30' : file.status === 'error' ? 'bg-red-900/30' : 'bg-gray-700/30'}">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <span class="flex-shrink-0">
+                    ${file.status === 'completed' ? '✅' : file.status === 'processing' ? '⏳' : file.status === 'error' ? '❌' : '📄'}
+                </span>
+                <span class="truncate ${file.status === 'completed' ? 'text-green-300' : file.status === 'error' ? 'text-red-300' : 'text-gray-300'}" title="${file.file.name}">
+                    ${file.file.name}
+                </span>
+                ${file.giornata ? `<span class="flex-shrink-0 text-xs bg-orange-600/50 px-1.5 py-0.5 rounded">G${file.giornata}</span>` : ''}
+            </div>
+            ${file.status === 'pending' ? `
+                <button onclick="removeFromFormationsQueue(${index})" class="text-red-400 hover:text-red-300 flex-shrink-0" title="Rimuovi">
+                    ✕
+                </button>
+            ` : ''}
+            ${file.status === 'error' ? `<span class="text-xs text-red-400 flex-shrink-0" title="${file.error}">${file.error?.substring(0, 30)}...</span>` : ''}
+        </li>
+    `).join('');
+    
+    // Abilita/disabilita pulsante upload
+    const pendingFiles = formationsXlsxQueue.filter(f => f.status === 'pending').length;
+    if (pendingFiles > 0 && !formationsQueueProcessing) {
+        uploadButton.disabled = false;
+        uploadButton.classList.remove('btn-secondary');
+        uploadButton.classList.add('btn-primary');
+        uploadButton.textContent = `🚀 Carica ${pendingFiles} File in Coda`;
+    } else if (formationsQueueProcessing) {
+        uploadButton.disabled = true;
+        uploadButton.textContent = '⏳ Elaborazione in corso...';
+    } else {
+        uploadButton.disabled = true;
+        uploadButton.classList.remove('btn-primary');
+        uploadButton.classList.add('btn-secondary');
+        uploadButton.textContent = '🚀 Carica Formazioni da Excel';
     }
 };
 
 /**
- * Processa il file Excel delle formazioni usando SheetJS
- * Layout: Doppia colonna con partite (casa a sinistra, ospite a destra)
- * 
- * Struttura per ogni partita:
- * - Riga nome squadra + risultato
- * - Riga modulo
- * - Righe titolari (P/D/C/A)
- * - "Panchina"
- * - Righe panchina
- * - "Modificatore difesa" + valore
- * - "Altri bonus" + valore (NUOVO!)
- * - "TOTALE:" + valore
- * - "Inserita via..." timestamp
+ * Rimuove un file dalla coda formazioni
+ */
+export const removeFromFormationsQueue = (index) => {
+    if (formationsXlsxQueue[index]?.status === 'pending') {
+        formationsXlsxQueue.splice(index, 1);
+        updateFormationsQueueUI();
+    }
+};
+
+/**
+ * Svuota la coda dei file formazioni
+ */
+export const clearFormationsQueue = () => {
+    if (formationsQueueProcessing) {
+        messageBox('Impossibile svuotare la coda durante l\'elaborazione.');
+        return;
+    }
+    formationsXlsxQueue = [];
+    document.getElementById('formations-xlsx-file-input').value = '';
+    updateFormationsQueueUI();
+};
+
+/**
+ * Gestisce la selezione dei file Excel delle formazioni (multipli)
+ */
+export const handleFormationsXlsxFileSelect = () => {
+    const fileInput = document.getElementById('formations-xlsx-file-input');
+    
+    if (fileInput.files.length > 0) {
+        // Aggiungi i nuovi file alla coda
+        for (const file of fileInput.files) {
+            // Evita duplicati controllando il nome file
+            const alreadyInQueue = formationsXlsxQueue.some(f => f.file.name === file.name && f.status === 'pending');
+            if (!alreadyInQueue) {
+                formationsXlsxQueue.push({
+                    file: file,
+                    status: 'pending', // pending, processing, completed, error
+                    giornata: null,
+                    error: null
+                });
+            }
+        }
+        
+        // Mantieni compatibilità con vecchio codice
+        selectedFormationsXlsxFile = fileInput.files[0];
+        
+        updateFormationsQueueUI();
+        
+        // Reset input per permettere ri-selezione stesso file
+        fileInput.value = '';
+    }
+};
+
+/**
+ * Conferma il caricamento delle formazioni da Excel (coda multipla)
+ */
+export const confirmFormationsXlsxUpload = () => {
+    const pendingFiles = formationsXlsxQueue.filter(f => f.status === 'pending');
+    
+    if (pendingFiles.length === 0) {
+        messageBox('Seleziona almeno un file Excel prima di procedere.');
+        return;
+    }
+    
+    const fileList = pendingFiles.map(f => `  • ${f.file.name}`).join('\n');
+    const message = pendingFiles.length === 1 
+        ? `Confermi il caricamento delle formazioni dal file:\n${fileList}\n\n⚠️ ATTENZIONE: Le formazioni precedenti per la giornata verranno sovrascritte.`
+        : `Confermi il caricamento delle formazioni da ${pendingFiles.length} file:\n${fileList}\n\n⚠️ ATTENZIONE: Le formazioni precedenti per ogni giornata verranno sovrascritte.`;
+    
+    if (confirm(message)) {
+        processFormationsXlsxQueue();
+    }
+};
+
+/**
+ * Processa la coda dei file formazioni uno alla volta
+ */
+const processFormationsXlsxQueue = async () => {
+    if (formationsQueueProcessing) return;
+    
+    formationsQueueProcessing = true;
+    updateFormationsQueueUI();
+    
+    const queueStatus = document.getElementById('formations-xlsx-queue-status');
+    const currentFileSpan = document.getElementById('formations-xlsx-current-file');
+    const queueCurrentSpan = document.getElementById('formations-xlsx-queue-current');
+    const queueTotalSpan = document.getElementById('formations-xlsx-queue-total');
+    
+    const pendingFiles = formationsXlsxQueue.filter(f => f.status === 'pending');
+    const totalFiles = pendingFiles.length;
+    
+    queueStatus?.classList.remove('hidden');
+    queueTotalSpan.textContent = totalFiles;
+    
+    let processedCount = 0;
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (let i = 0; i < formationsXlsxQueue.length; i++) {
+        const queueItem = formationsXlsxQueue[i];
+        
+        if (queueItem.status !== 'pending') continue;
+        
+        processedCount++;
+        queueCurrentSpan.textContent = processedCount;
+        currentFileSpan.textContent = `Elaborazione: ${queueItem.file.name}`;
+        
+        queueItem.status = 'processing';
+        updateFormationsQueueUI();
+        
+        try {
+            // Imposta il file corrente per la funzione di processing
+            selectedFormationsXlsxFile = queueItem.file;
+            
+            // Processa il file
+            const result = await processFormationsXlsxFileSingle(queueItem.file);
+            
+            queueItem.status = 'completed';
+            queueItem.giornata = result.giornata;
+            successCount++;
+            
+        } catch (error) {
+            console.error(`Errore elaborazione ${queueItem.file.name}:`, error);
+            queueItem.status = 'error';
+            queueItem.error = error.message;
+            errorCount++;
+        }
+        
+        updateFormationsQueueUI();
+    }
+    
+    formationsQueueProcessing = false;
+    queueStatus?.classList.add('hidden');
+    
+    updateFormationsQueueUI();
+    
+    // Messaggio finale riepilogativo
+    let summaryMessage = `📊 Elaborazione completata!\n\n`;
+    summaryMessage += `✅ File elaborati con successo: ${successCount}\n`;
+    if (errorCount > 0) {
+        summaryMessage += `❌ File con errori: ${errorCount}\n`;
+    }
+    
+    const completedFiles = formationsXlsxQueue.filter(f => f.status === 'completed');
+    if (completedFiles.length > 0) {
+        const giornate = completedFiles.map(f => f.giornata).filter(g => g).sort((a, b) => a - b);
+        summaryMessage += `\n📅 Giornate caricate: ${giornate.join(', ')}`;
+    }
+    
+    messageBox(summaryMessage);
+};
+
+/**
+ * Processa un singolo file Excel delle formazioni
+ * @param {File} file - Il file Excel da processare
+ * @returns {Promise<{giornata: number, formazioni: number, bonuses: number}>} Risultato con la giornata processata
+ */
+const processFormationsXlsxFileSingle = async (file) => {
+    // Mostra progress bar
+    const progressContainer = document.getElementById('formations-xlsx-progress');
+    if (progressContainer) progressContainer.classList.remove('hidden');
+    
+    updateProgress(5, `Lettura ${file.name}...`, null, null, 'formations-xlsx-progress');
+    
+    // Leggi il file Excel con SheetJS
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    
+    // Cerca un foglio che contiene "Formazioni" nel nome
+    let sheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('formazioni'));
+    if (!sheetName) {
+        sheetName = workbook.SheetNames[0];
+        console.warn('Foglio "Formazioni" non trovato, uso il primo foglio:', sheetName);
+    }
+    console.log('Fogli disponibili:', workbook.SheetNames);
+    console.log('Foglio selezionato:', sheetName);
+    
+    const worksheet = workbook.Sheets[sheetName];
+    
+    // Converti in array di array (righe)
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    
+    console.log('Righe totali nel file:', jsonData.length);
+    console.log('Prime 5 righe:', jsonData.slice(0, 5));
+    
+    // Contatori ordine per preservare l'ordine dei calciatori per ogni squadra
+    // Fondamentale per la corretta simulazione delle sostituzioni dalla panchina
+    const ordinePerSquadra = {};
+    
+    // Estrai la giornata dal nome del foglio (es. "Formazioni 21 giornata" -> 21)
+    let giornata = 0;
+    const giornataMatch = sheetName.match(/(\d+)\s*giornata/i);
+    if (giornataMatch) {
+        giornata = parseInt(giornataMatch[1]);
+    } else {
+        // Prova a cercare nel titolo del foglio (riga 1)
+        if (jsonData[0]) {
+            const titleMatch = String(jsonData[0][0] || '').match(/Giornata\s*(\d+)/i);
+            if (titleMatch) {
+                giornata = parseInt(titleMatch[1]);
+            }
+        }
+    }
+    
+    if (giornata === 0) {
+        throw new Error('Impossibile determinare la giornata dal file. Assicurati che il nome del foglio contenga "Formazioni XX giornata" oppure che la prima riga contenga "Giornata XX".');
+    }
+    
+    console.log('Excel Formazioni caricato:', {
+        foglio: sheetName,
+        giornata: giornata
+    });
+    
+    updateProgress(15, `Parsing formazioni giornata ${giornata}...`, null, null, 'formations-xlsx-progress');
+    
+    // Struttura dati
+    const formazioni = [];
+    const bonuses = [];
+    const squadreSet = new Set();
+    
+    // Stato parser
+    let currentSquadLeft = null;
+    let currentSquadRight = null;
+    let currentAvversarioLeft = null;
+    let currentAvversarioRight = null;
+    let currentResultLeft = null;
+    let currentResultRight = null;
+    let currentModuloLeft = null;
+    let currentModuloRight = null;
+    let currentSectionLeft = 'TITOLARE';
+    let currentSectionRight = 'TITOLARE';
+    let matchIdCounter = 0;
+    let currentMatchIdLeft = null;
+    let currentMatchIdRight = null;
+
+    // Funzione helper per parsare numeri con virgola italiana
+    const parseItalianNumber = (str) => {
+        if (!str) return 0;
+        const normalized = String(str).replace(',', '.');
+        return parseFloat(normalized) || 0;
+    };
+    
+    // Parsing del file - inizia dalla riga 4 (indice 3)
+    for (let i = 3; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row.length === 0) continue;
+        
+        const cellA = String(row[0] || '').trim();
+        const cellB = String(row[1] || '').trim();
+        const cellC = String(row[2] || '').trim();
+        const cellD = String(row[3] || '').trim();
+        const cellE = String(row[4] || '').trim();
+        
+        const cellG = String(row[6] || '').trim();
+        const cellH = String(row[7] || '').trim();
+        const cellI = String(row[8] || '').trim();
+        const cellJ = String(row[9] || '').trim();
+        const cellK = String(row[10] || '').trim();
+        
+        // Debug: mostra le prime righe per capire la struttura
+        if (i < 10) {
+            console.log(`Riga ${i}: A="${cellA}" B="${cellB}" C="${cellC}" D="${cellD}" E="${cellE}" | G="${cellG}" H="${cellH}"`);
+        }
+        
+        // === Identificazione righe speciali ===
+        const cellF = String(row[5] || '').trim();
+        const resultPattern = /^\d+-\d+$/;
+        
+        let foundResult = null;
+        if (cellE && resultPattern.test(cellE)) {
+            foundResult = cellE;
+        } else if (cellF && resultPattern.test(cellF)) {
+            foundResult = cellF;
+        }
+        
+        if (foundResult && cellA && cellG) {
+            matchIdCounter++;
+            currentMatchIdLeft = `G${giornata}_M${matchIdCounter}`;
+            currentMatchIdRight = currentMatchIdLeft;
+
+            currentSquadLeft = cellA;
+            currentSquadRight = cellG;
+            currentAvversarioLeft = cellG;
+            currentAvversarioRight = cellA;
+            currentResultLeft = foundResult;
+            currentResultRight = foundResult;
+            currentSectionLeft = 'TITOLARE';
+            currentSectionRight = 'TITOLARE';
+
+            squadreSet.add(currentSquadLeft);
+            squadreSet.add(currentSquadRight);
+
+            console.log(`Partita trovata: ${currentSquadLeft} vs ${currentSquadRight} (${foundResult})`);
+            continue;
+        }
+        
+        // Riga modulo
+        if (cellA && cellA.match(/^\d{3,4}/) && !cellB) {
+            currentModuloLeft = cellA;
+        }
+        if (cellG && cellG.match(/^\d{3,4}/) && !cellH) {
+            currentModuloRight = cellG;
+        }
+        
+        // Riga "Panchina"
+        if (cellB === 'Panchina' || cellA === 'Panchina') {
+            currentSectionLeft = 'PANCHINA';
+        }
+        if (cellH === 'Panchina' || cellG === 'Panchina') {
+            currentSectionRight = 'PANCHINA';
+        }
+        
+        // Riga "Modificatore difesa"
+        if (cellA === 'Modificatore difesa' && currentSquadLeft) {
+            const valore = parseItalianNumber(cellE);
+            if (valore !== 0) {
+                bonuses.push({
+                    giornata,
+                    matchId: currentMatchIdLeft,
+                    squadra: currentSquadLeft,
+                    avversario: currentAvversarioLeft,
+                    bonus: { nome: 'Modificatore difesa', valore },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+        if (cellG === 'Modificatore difesa' && currentSquadRight) {
+            const valore = parseItalianNumber(cellK);
+            if (valore !== 0) {
+                bonuses.push({
+                    giornata,
+                    matchId: currentMatchIdRight,
+                    squadra: currentSquadRight,
+                    avversario: currentAvversarioRight,
+                    bonus: { nome: 'Modificatore difesa', valore },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+        
+        // Riga "Modificatore fairplay"
+        if (cellA === 'Modificatore fairplay' && currentSquadLeft) {
+            const valore = parseItalianNumber(cellE);
+            if (valore !== 0) {
+                bonuses.push({
+                    giornata,
+                    matchId: currentMatchIdLeft,
+                    squadra: currentSquadLeft,
+                    avversario: currentAvversarioLeft,
+                    bonus: { nome: 'Modificatore fairplay', valore },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+        if (cellG === 'Modificatore fairplay' && currentSquadRight) {
+            const valore = parseItalianNumber(cellK);
+            if (valore !== 0) {
+                bonuses.push({
+                    giornata,
+                    matchId: currentMatchIdRight,
+                    squadra: currentSquadRight,
+                    avversario: currentAvversarioRight,
+                    bonus: { nome: 'Modificatore fairplay', valore },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+        
+        // Riga "Altri bonus"
+        if (cellA === 'Altri bonus' && currentSquadLeft) {
+            const valore = parseItalianNumber(cellE);
+            if (valore !== 0) {
+                bonuses.push({
+                    giornata,
+                    matchId: currentMatchIdLeft,
+                    squadra: currentSquadLeft,
+                    avversario: currentAvversarioLeft,
+                    bonus: { nome: 'Altri bonus', valore },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+        if (cellG === 'Altri bonus' && currentSquadRight) {
+            const valore = parseItalianNumber(cellK);
+            if (valore !== 0) {
+                bonuses.push({
+                    giornata,
+                    matchId: currentMatchIdRight,
+                    squadra: currentSquadRight,
+                    avversario: currentAvversarioRight,
+                    bonus: { nome: 'Altri bonus', valore },
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+        
+        // Riga "TOTALE:" - fine del blocco squadra
+        if (cellC && String(cellC).includes('TOTALE')) {
+            currentSquadLeft = null;
+            currentModuloLeft = null;
+            currentSectionLeft = 'TITOLARE';
+        }
+        if (cellI && String(cellI).includes('TOTALE')) {
+            currentSquadRight = null;
+            currentModuloRight = null;
+            currentSectionRight = 'TITOLARE';
+        }
+        
+        // === Righe calciatori ===
+        // Colonna sinistra
+        if (['P', 'D', 'C', 'A'].includes(cellA) && cellB && currentSquadLeft) {
+            const ruolo = cellA;
+            const calciatore = cellB.replace(/\s*\*\s*$/, '');
+            
+            const voto_base = parseItalianNumber(cellD) || null;
+            const fantavoto = parseItalianNumber(cellE) || null;
+            const ha_giocato = voto_base !== null && voto_base > 0;
+            
+            // Incrementa l'ordine per questa squadra (preserva l'ordine dall'Excel)
+            if (!ordinePerSquadra[currentSquadLeft]) ordinePerSquadra[currentSquadLeft] = 0;
+            ordinePerSquadra[currentSquadLeft]++;
+            
+            formazioni.push({
+                giornata,
+                matchId: currentMatchIdLeft,
+                squadra: currentSquadLeft,
+                avversario: currentAvversarioLeft,
+                lato: 'casa',
+                punteggio: currentResultLeft,
+                formazione: currentModuloLeft,
+                sezione: currentSectionLeft,
+                ruolo,
+                calciatore,
+                voto_base,
+                fantavoto,
+                ha_giocato,
+                ordine: ordinePerSquadra[currentSquadLeft],
+                record_tipo: 'GIOCATORE',
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Colonna destra
+        if (['P', 'D', 'C', 'A'].includes(cellG) && cellH && currentSquadRight) {
+            const ruolo = cellG;
+            const calciatore = cellH.replace(/\s*\*\s*$/, '');
+            const voto_base = parseItalianNumber(cellJ) || null;
+            const fantavoto = parseItalianNumber(cellK) || null;
+            const ha_giocato = voto_base !== null && voto_base > 0;
+            
+            // Incrementa l'ordine per questa squadra (preserva l'ordine dall'Excel)
+            if (!ordinePerSquadra[currentSquadRight]) ordinePerSquadra[currentSquadRight] = 0;
+            ordinePerSquadra[currentSquadRight]++;
+            
+            formazioni.push({
+                giornata,
+                matchId: currentMatchIdRight,
+                squadra: currentSquadRight,
+                avversario: currentAvversarioRight,
+                lato: 'ospite',
+                punteggio: currentResultRight,
+                formazione: currentModuloRight,
+                sezione: currentSectionRight,
+                ruolo,
+                calciatore,
+                voto_base,
+                fantavoto,
+                ha_giocato,
+                ordine: ordinePerSquadra[currentSquadRight],
+                record_tipo: 'GIOCATORE',
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+    
+    console.log(`Formazioni parsate: ${formazioni.length} giocatori, ${bonuses.length} bonus`);
+    
+    if (formazioni.length === 0) {
+        throw new Error('Nessuna formazione trovata nel file. Verifica il formato.');
+    }
+    
+    updateProgress(50, `Cancellazione formazioni giornata ${giornata}...`, null, null, 'formations-xlsx-progress');
+    
+    // Salva i dati in Firestore
+    const formationsCollection = getFormationsCollectionRef();
+    
+    // Cancella formazioni esistenti per questa giornata
+    const q = query(formationsCollection, where('giornata', '==', giornata));
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    updateProgress(60, `Salvataggio formazioni giornata ${giornata}...`, null, null, 'formations-xlsx-progress');
+    
+    // Salva nuove formazioni
+    let savedCount = 0;
+    const savedBySquadra = {};
+    for (const formazione of formazioni) {
+        await addDoc(formationsCollection, formazione);
+        savedCount++;
+        
+        // Traccia per squadra
+        if (!savedBySquadra[formazione.squadra]) savedBySquadra[formazione.squadra] = 0;
+        savedBySquadra[formazione.squadra]++;
+        
+        if (savedCount % 30 === 0) {
+            const progress = 60 + (savedCount / formazioni.length) * 25;
+            updateProgress(progress, `Salvati ${savedCount}/${formazioni.length} record...`, null, null, 'formations-xlsx-progress');
+        }
+    }
+    
+    console.log(`✅ XLSX Giornata ${giornata}: Salvati ${savedCount} record`, {
+        squadre: savedBySquadra,
+        totalFormazioni: formazioni.length
+    });
+    
+    // Salva i bonus
+    updateProgress(85, 'Salvataggio bonus...', null, null, 'formations-xlsx-progress');
+    
+    if (bonuses.length > 0) {
+        const { collection } = await import('./firebase-config.js');
+        const dbModule = await import('./firebase-config.js');
+        const bonusesCollection = collection(dbModule.db, 'fantabet_squad_bonuses');
+        
+        // Cancella bonus precedenti per questa giornata
+        const qBonus = query(bonusesCollection, where('giornata', '==', giornata));
+        const snapshotBonus = await getDocs(qBonus);
+        const deleteBonusPromises = snapshotBonus.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deleteBonusPromises);
+        
+        // Salva nuovi bonus
+        for (const bonus of bonuses) {
+            await addDoc(bonusesCollection, bonus);
+        }
+        
+        console.log(`Bonus salvati: ${bonuses.length}`);
+    }
+
+    updateProgress(100, `Completato giornata ${giornata}!`, null, null, 'formations-xlsx-progress');
+
+    // Mostra riepilogo
+    const giornateSet = new Set([giornata]);
+    renderFormationsData(formazioni, giornateSet, squadreSet);
+
+    // Nascondi progress bar dopo un breve delay
+    setTimeout(() => {
+        const progressContainer = document.getElementById('formations-xlsx-progress');
+        if (progressContainer) progressContainer.classList.add('hidden');
+    }, 1000);
+
+    return {
+        giornata,
+        formazioni: formazioni.length,
+        bonuses: bonuses.length
+    };
+};
+
+/**
+ * Processa il file Excel delle formazioni usando SheetJS (wrapper per retrocompatibilità)
+ * Usa la coda se ci sono più file, altrimenti processa singolo file
  */
 export const processFormationsXlsxFile = async () => {
+    // Se ci sono file in coda, usa la coda
+    if (formationsXlsxQueue.length > 0) {
+        confirmFormationsXlsxUpload();
+        return;
+    }
+    
+    // Altrimenti processa singolo file per retrocompatibilità
     if (!selectedFormationsXlsxFile) {
         messageBox('Nessun file selezionato.');
         return;
@@ -1990,414 +2662,19 @@ export const processFormationsXlsxFile = async () => {
     uploadButton.disabled = true;
     uploadButton.textContent = 'Caricamento...';
     
-    // Mostra progress bar
-    const progressContainer = document.getElementById('formations-xlsx-progress');
-    if (progressContainer) progressContainer.classList.remove('hidden');
-    
     try {
-        updateProgress(5, 'Lettura file Excel...', null, null, 'formations-xlsx-progress');
-        
-        // Leggi il file Excel con SheetJS
-        const arrayBuffer = await selectedFormationsXlsxFile.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        
-        // Cerca un foglio che contiene "Formazioni" nel nome
-        let sheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('formazioni'));
-        if (!sheetName) {
-            sheetName = workbook.SheetNames[0];
-            console.warn('Foglio "Formazioni" non trovato, uso il primo foglio:', sheetName);
+        const result = await processFormationsXlsxFileSingle(selectedFormationsXlsxFile);
+        let message = `Formazioni caricate da Excel!\n\n✅ Giornata ${result.giornata}\n✅ ${result.formazioni} giocatori\n✅ ${result.bonuses} bonus`;
+        if (result.risultati > 0) {
+            message += `\n✅ ${result.risultati} risultati campionato aggiornati`;
         }
-        console.log('Fogli disponibili:', workbook.SheetNames);
-        console.log('Foglio selezionato:', sheetName);
-        
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Converti in array di array (righe)
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-        
-        console.log('Righe totali nel file:', jsonData.length);
-        console.log('Prime 5 righe:', jsonData.slice(0, 5));
-        
-        // Estrai la giornata dal nome del foglio (es. "Formazioni 21 giornata" -> 21)
-        let giornata = 0;
-        const giornataMatch = sheetName.match(/(\d+)\s*giornata/i);
-        if (giornataMatch) {
-            giornata = parseInt(giornataMatch[1]);
-        } else {
-            // Prova a cercare nel titolo del foglio (riga 1)
-            if (jsonData[0]) {
-                const titleMatch = String(jsonData[0][0] || '').match(/Giornata\s*(\d+)/i);
-                if (titleMatch) {
-                    giornata = parseInt(titleMatch[1]);
-                }
-            }
-        }
-        
-        if (giornata === 0) {
-            throw new Error('Impossibile determinare la giornata dal file. Assicurati che il nome del foglio contenga "Formazioni XX giornata" oppure che la prima riga contenga "Giornata XX".');
-        }
-        
-        console.log('Excel Formazioni caricato:', {
-            foglio: sheetName,
-            giornata: giornata
-        });
-        
-        updateProgress(15, `Parsing formazioni giornata ${giornata}...`, null, null, 'formations-xlsx-progress');
-        
-        // Struttura dati
-        const formazioni = [];
-        const bonuses = [];
-        const squadreSet = new Set();
-        
-        // Stato parser
-        let currentSquadLeft = null;
-        let currentSquadRight = null;
-        let currentAvversarioLeft = null;
-        let currentAvversarioRight = null;
-        let currentResultLeft = null;
-        let currentResultRight = null;
-        let currentModuloLeft = null;
-        let currentModuloRight = null;
-        let currentSectionLeft = 'TITOLARE'; // TITOLARE o PANCHINA
-        let currentSectionRight = 'TITOLARE';
-        let matchIdCounter = 0;
-        let currentMatchIdLeft = null;
-        let currentMatchIdRight = null;
-        
-        // Parsing del file - inizia dalla riga 4 (indice 3)
-        for (let i = 3; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            if (!row || row.length === 0) continue;
-            
-            const cellA = String(row[0] || '').trim();
-            const cellB = String(row[1] || '').trim();
-            const cellC = String(row[2] || '').trim();
-            const cellD = String(row[3] || '').trim();
-            const cellE = String(row[4] || '').trim();
-            
-            const cellG = String(row[6] || '').trim();
-            const cellH = String(row[7] || '').trim();
-            const cellI = String(row[8] || '').trim();
-            const cellJ = String(row[9] || '').trim();
-            const cellK = String(row[10] || '').trim();
-            
-            // Debug: mostra le prime righe per capire la struttura
-            if (i < 10) {
-                console.log(`Riga ${i}: A="${cellA}" B="${cellB}" C="${cellC}" D="${cellD}" E="${cellE}" | G="${cellG}" H="${cellH}"`);
-            }
-            
-            // === Identificazione righe speciali ===
-            
-            // Riga nome squadra + risultato (es. "DISAGIATI FC" | | | "2-4" | | | "FC SANTA CLAUS")
-            // La riga ha un risultato in colonna F (indice 5) e squadra ospite in G
-            // Oppure risultato in E (indice 4)
-            const cellF = String(row[5] || '').trim();
-            const resultPattern = /^\d+-\d+$/;
-            
-            // Cerca il risultato in E o F
-            let foundResult = null;
-            if (cellE && resultPattern.test(cellE)) {
-                foundResult = cellE;
-            } else if (cellF && resultPattern.test(cellF)) {
-                foundResult = cellF;
-            }
-            
-            if (foundResult && cellA && cellG) {
-                // Nuova partita trovata
-                matchIdCounter++;
-                currentMatchIdLeft = `G${giornata}_M${matchIdCounter}`;
-                currentMatchIdRight = currentMatchIdLeft;
-                
-                currentSquadLeft = cellA;
-                currentSquadRight = cellG;
-                currentAvversarioLeft = cellG;
-                currentAvversarioRight = cellA;
-                currentResultLeft = foundResult;
-                currentResultRight = foundResult;
-                currentSectionLeft = 'TITOLARE';
-                currentSectionRight = 'TITOLARE';
-                
-                squadreSet.add(currentSquadLeft);
-                squadreSet.add(currentSquadRight);
-                
-                console.log(`Partita trovata: ${currentSquadLeft} vs ${currentSquadRight} (${foundResult})`);
-                continue;
-            }
-            
-            // Riga modulo (numero come "433", "451", "352")
-            if (cellA && cellA.match(/^\d{3,4}/) && !cellB) {
-                currentModuloLeft = cellA;
-            }
-            if (cellG && cellG.match(/^\d{3,4}/) && !cellH) {
-                currentModuloRight = cellG;
-            }
-            
-            // Riga "Panchina"
-            if (cellB === 'Panchina' || cellA === 'Panchina') {
-                currentSectionLeft = 'PANCHINA';
-            }
-            if (cellH === 'Panchina' || cellG === 'Panchina') {
-                currentSectionRight = 'PANCHINA';
-            }
-            
-            // Funzione helper per parsare numeri con virgola italiana
-            const parseItalianNumber = (str) => {
-                if (!str) return 0;
-                // Sostituisce la virgola con il punto per parseFloat
-                const normalized = String(str).replace(',', '.');
-                return parseFloat(normalized) || 0;
-            };
-            
-            // Riga "Modificatore difesa"
-            if (cellA === 'Modificatore difesa' && currentSquadLeft) {
-                const valore = parseItalianNumber(cellE);
-                if (valore !== 0) {
-                    bonuses.push({
-                        giornata,
-                        matchId: currentMatchIdLeft,
-                        squadra: currentSquadLeft,
-                        avversario: currentAvversarioLeft,
-                        bonus: { nome: 'Modificatore difesa', valore },
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-            if (cellG === 'Modificatore difesa' && currentSquadRight) {
-                const valore = parseItalianNumber(cellK);
-                if (valore !== 0) {
-                    bonuses.push({
-                        giornata,
-                        matchId: currentMatchIdRight,
-                        squadra: currentSquadRight,
-                        avversario: currentAvversarioRight,
-                        bonus: { nome: 'Modificatore difesa', valore },
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-            
-            // Riga "Modificatore fairplay" (NUOVO!)
-            if (cellA === 'Modificatore fairplay' && currentSquadLeft) {
-                const valore = parseItalianNumber(cellE);
-                if (valore !== 0) {
-                    bonuses.push({
-                        giornata,
-                        matchId: currentMatchIdLeft,
-                        squadra: currentSquadLeft,
-                        avversario: currentAvversarioLeft,
-                        bonus: { nome: 'Modificatore fairplay', valore },
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-            if (cellG === 'Modificatore fairplay' && currentSquadRight) {
-                const valore = parseItalianNumber(cellK);
-                if (valore !== 0) {
-                    bonuses.push({
-                        giornata,
-                        matchId: currentMatchIdRight,
-                        squadra: currentSquadRight,
-                        avversario: currentAvversarioRight,
-                        bonus: { nome: 'Modificatore fairplay', valore },
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-            
-            // Riga "Altri bonus"
-            if (cellA === 'Altri bonus' && currentSquadLeft) {
-                console.log(`DEBUG Altri bonus SX: cellA="${cellA}" cellB="${cellB}" cellC="${cellC}" cellD="${cellD}" cellE="${cellE}"`);
-                const valore = parseItalianNumber(cellE);
-                console.log(`DEBUG Altri bonus SX valore parsato: ${valore}`);
-                if (valore !== 0) {
-                    bonuses.push({
-                        giornata,
-                        matchId: currentMatchIdLeft,
-                        squadra: currentSquadLeft,
-                        avversario: currentAvversarioLeft,
-                        bonus: { nome: 'Altri bonus', valore },
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-            if (cellG === 'Altri bonus' && currentSquadRight) {
-                console.log(`DEBUG Altri bonus DX: cellG="${cellG}" cellH="${cellH}" cellI="${cellI}" cellJ="${cellJ}" cellK="${cellK}"`);
-                const valore = parseItalianNumber(cellK);
-                console.log(`DEBUG Altri bonus DX valore parsato: ${valore}`);
-                if (valore !== 0) {
-                    bonuses.push({
-                        giornata,
-                        matchId: currentMatchIdRight,
-                        squadra: currentSquadRight,
-                        avversario: currentAvversarioRight,
-                        bonus: { nome: 'Altri bonus', valore },
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-            
-            // Riga "TOTALE:" - fine del blocco squadra
-            if (cellC && String(cellC).includes('TOTALE')) {
-                currentSquadLeft = null;
-                currentModuloLeft = null;
-                currentSectionLeft = 'TITOLARE';
-            }
-            if (cellI && String(cellI).includes('TOTALE')) {
-                currentSquadRight = null;
-                currentModuloRight = null;
-                currentSectionRight = 'TITOLARE';
-            }
-            
-            // === Righe calciatori ===
-            // Layout: Ruolo | Nome | (vuota) | Voto | FantaVoto
-            // Colonne: A=Ruolo, B=Nome, C=vuota, D=Voto, E=Fantavoto
-            
-            // Colonna sinistra
-            if (['P', 'D', 'C', 'A'].includes(cellA) && cellB && currentSquadLeft) {
-                const ruolo = cellA;
-                const calciatore = cellB.replace(/\s*\*\s*$/, ''); // Rimuove asterisco
-                
-                // Colonna D = voto base, Colonna E = fantavoto
-                const voto_base = parseItalianNumber(cellD) || null;
-                const fantavoto = parseItalianNumber(cellE) || null;
-                const ha_giocato = voto_base !== null && voto_base > 0;
-                
-                formazioni.push({
-                    giornata,
-                    matchId: currentMatchIdLeft,
-                    squadra: currentSquadLeft,
-                    avversario: currentAvversarioLeft,
-                    lato: 'casa',
-                    punteggio: currentResultLeft,
-                    formazione: currentModuloLeft,
-                    sezione: currentSectionLeft,
-                    ruolo,
-                    calciatore,
-                    voto_base,
-                    fantavoto,
-                    ha_giocato,
-                    fantavoto_in_verde: fantavoto !== null ? 1 : 0,
-                    record_tipo: 'GIOCATORE',
-                    timestamp: new Date().toISOString()
-                });
-            }
-            
-            // Colonna destra
-            // Colonne: G=Ruolo, H=Nome, I=vuota, J=Voto, K=Fantavoto
-            if (['P', 'D', 'C', 'A'].includes(cellG) && cellH && currentSquadRight) {
-                const ruolo = cellG;
-                const calciatore = cellH.replace(/\s*\*\s*$/, ''); // Rimuove asterisco
-                // Colonna J = voto base, Colonna K = fantavoto
-                const voto_base = parseItalianNumber(cellJ) || null;
-                const fantavoto = parseItalianNumber(cellK) || null;
-                const ha_giocato = voto_base !== null && voto_base > 0;
-                
-                formazioni.push({
-                    giornata,
-                    matchId: currentMatchIdRight,
-                    squadra: currentSquadRight,
-                    avversario: currentAvversarioRight,
-                    lato: 'ospite',
-                    punteggio: currentResultRight,
-                    formazione: currentModuloRight,
-                    sezione: currentSectionRight,
-                    ruolo,
-                    calciatore,
-                    voto_base,
-                    fantavoto,
-                    ha_giocato,
-                    fantavoto_in_verde: fantavoto !== null ? 1 : 0,
-                    record_tipo: 'GIOCATORE',
-                    timestamp: new Date().toISOString()
-                });
-            }
-        }
-        
-        console.log(`Formazioni parsate: ${formazioni.length} giocatori, ${bonuses.length} bonus`);
-        
-        // DEBUG: Mostra i primi 5 giocatori come esempio
-        console.log('PRIMI 5 GIOCATORI PARSATI:', formazioni.slice(0, 5).map(f => ({
-            giornata: f.giornata,
-            squadra: f.squadra,
-            calciatore: f.calciatore,
-            ruolo: f.ruolo,
-            voto_base: f.voto_base,
-            fantavoto: f.fantavoto,
-            sezione: f.sezione
-        })));
-        
-        if (formazioni.length === 0) {
-            throw new Error('Nessuna formazione trovata nel file. Verifica il formato.');
-        }
-        
-        updateProgress(50, 'Cancellazione formazioni precedenti...', null, null, 'formations-xlsx-progress');
-        
-        // Salva i dati in Firestore
-        const formationsCollection = getFormationsCollectionRef();
-        
-        // Cancella formazioni esistenti per questa giornata
-        const q = query(formationsCollection, where('giornata', '==', giornata));
-        const snapshot = await getDocs(q);
-        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
-        await Promise.all(deletePromises);
-        
-        updateProgress(60, 'Salvataggio nuove formazioni...', null, null, 'formations-xlsx-progress');
-        
-        // Salva nuove formazioni
-        let savedCount = 0;
-        for (const formazione of formazioni) {
-            await addDoc(formationsCollection, formazione);
-            savedCount++;
-            
-            if (savedCount % 30 === 0) {
-                const progress = 60 + (savedCount / formazioni.length) * 25;
-                updateProgress(progress, `Salvati ${savedCount}/${formazioni.length} record...`, null, null, 'formations-xlsx-progress');
-            }
-        }
-        
-        // Salva i bonus
-        updateProgress(90, 'Salvataggio bonus...', null, null, 'formations-xlsx-progress');
-        
-        if (bonuses.length > 0) {
-            const { collection } = await import('./firebase-config.js');
-            const dbModule = await import('./firebase-config.js');
-            const bonusesCollection = collection(dbModule.db, 'fantabet_squad_bonuses');
-            
-            // Cancella bonus precedenti per questa giornata
-            const qBonus = query(bonusesCollection, where('giornata', '==', giornata));
-            const snapshotBonus = await getDocs(qBonus);
-            const deleteBonusPromises = snapshotBonus.docs.map(doc => deleteDoc(doc.ref));
-            await Promise.all(deleteBonusPromises);
-            
-            // Salva nuovi bonus
-            for (const bonus of bonuses) {
-                await addDoc(bonusesCollection, bonus);
-            }
-            
-            console.log(`Bonus salvati: ${bonuses.length}`);
-        }
-        
-        updateProgress(100, 'Completato!', null, null, 'formations-xlsx-progress');
-        
-        // Mostra riepilogo
-        const giornateSet = new Set([giornata]);
-        renderFormationsData(formazioni, giornateSet, squadreSet);
-        
-        messageBox(`Formazioni caricate da Excel!\n\n✅ Giornata ${giornata}\n✅ ${squadreSet.size} squadre\n✅ ${formazioni.length} giocatori\n✅ ${bonuses.length} bonus (Mod.difesa + Altri bonus)`);
-        
-        // Reset UI dopo 2 secondi
-        setTimeout(() => {
-            uploadButton.disabled = false;
-            uploadButton.textContent = 'Carica Formazioni da Excel';
-            if (progressContainer) progressContainer.classList.add('hidden');
-        }, 2000);
-        
+        messageBox(message);
     } catch (error) {
         console.error('Errore durante il caricamento delle formazioni da Excel:', error);
         messageBox('Errore durante il caricamento: ' + error.message);
+    } finally {
         uploadButton.disabled = false;
-        uploadButton.textContent = 'Carica Formazioni da Excel';
-        if (progressContainer) progressContainer.classList.add('hidden');
+        uploadButton.textContent = '🚀 Carica Formazioni da Excel';
     }
 };
 
@@ -2444,3 +2721,5 @@ window.triggerFormationsXlsxFileInput = triggerFormationsXlsxFileInput;
 window.handleFormationsXlsxFileSelect = handleFormationsXlsxFileSelect;
 window.confirmFormationsXlsxUpload = confirmFormationsXlsxUpload;
 window.processFormationsXlsxFile = processFormationsXlsxFile;
+window.removeFromFormationsQueue = removeFromFormationsQueue;
+window.clearFormationsQueue = clearFormationsQueue;

@@ -867,6 +867,51 @@ export const clearFormationsForGiornata = async () => {
 };
 
 /**
+ * Cancella TUTTE le formazioni di tutte le giornate
+ */
+export const clearAllFormations = async () => {
+    const isUserAdmin = getIsUserAdmin();
+    if (!isUserAdmin) return;
+    
+    if (!confirm(`Sei sicuro di voler cancellare TUTTE le formazioni di tutte le giornate? Questa azione è irreversibile.`)) {
+        return;
+    }
+    
+    showProgressBar(`Cancellazione Tutte le Formazioni`);
+    
+    try {
+        const formationsCollection = getFormationsCollectionRef();
+        const snapshot = await getDocs(formationsCollection);
+        
+        const totalDocs = snapshot.docs.length;
+        if (totalDocs === 0) {
+            hideProgressBar();
+            messageBox(`Nessuna formazione trovata nel database.`);
+            return;
+        }
+        
+        let deletedCount = 0;
+        
+        for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(docSnapshot.ref);
+            deletedCount++;
+            
+            const progress = (deletedCount / totalDocs) * 100;
+            updateProgress(progress, `Cancellazione in corso...`, deletedCount, totalDocs);
+        }
+        
+        hideProgressBar();
+        messageBox(`Cancellate ${deletedCount} formazioni da tutte le giornate.`);
+        console.log(`Cancellate ${deletedCount} formazioni da tutte le giornate`);
+        
+    } catch (error) {
+        console.error("Errore cancellazione formazioni:", error);
+        hideProgressBar();
+        messageBox(`Errore durante la cancellazione: ${error.message}`);
+    }
+};
+
+/**
  * Reset crediti di tutti gli utenti a 100
  */
 export const resetUserCredits = async () => {
@@ -1335,6 +1380,7 @@ export const setupGlobalAdminFunctions = () => {
     window.clearOpenMatches = clearOpenMatches;
     window.clearAllBets = clearAllBets;
     window.clearFormationsForGiornata = clearFormationsForGiornata;
+    window.clearAllFormations = clearAllFormations;
     window.resetUserCredits = resetUserCredits;
     window.clearAllTeams = clearAllTeams;
     window.clearSquadsData = clearSquadsData;

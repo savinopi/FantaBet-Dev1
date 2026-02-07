@@ -2,6 +2,74 @@
 
 Tutti i cambiamenti notevoli di questo progetto saranno documentati in questo file.
 
+## [3.12.2] - 2026-02-07
+
+### Correzioni
+- **Statistiche Allenatore - Logica formazione ottimale**: Riscritta completamente
+  - Quando schierata ha < 11 giocatori: usa lo STESSO modulo della schierata, non prova all ALLOWED_FORMATIONS
+  - Sostituisce solo "pari ruolo" (P con P, D con D, C con C, A con A) con i migliori disponibili
+  - **Risolve bug FC SANTA CLAUS G4**: Ora calcola correttamente l'ottimale anche con 2 soli difensori con voto
+  - Efficacia del coach ora conta in tutte le situazioni, non solo con 11 giocatori schierati
+
+### Miglioramenti UI/UX Mobile
+- **Pulsante "Vedi dettaglio"**: Ora più grande e tocabile su mobile
+  - Larghezza intera (`w-full`), padding generoso (`py-3`), testo più grande
+  - Colori solido blu con hover/active state per feedback tattile
+  - Arrotondato e ombreggiato (design moderno)
+  
+- **Layout sezioni Statistiche Allenatore**: Riepilogo su 3 colonne (Schierata - Efficacia - Ottimale)
+  - Usa inline CSS Grid per garantire display su UNA riga anche su mobile (iPhone XR 414px)
+  - Gap e padding responsivo: ridotto su mobile, normale su desktop
+  - Testo numero: `text-base` su mobile → `text-xl` su desktop
+
+---
+
+## [3.12.1] - 2026-02-06
+
+### Correzioni
+- **Lettura colore celle Excel**: Il sistema ora legge il colore delle celle fantavoto dall'Excel
+  - Le celle **verdi** indicano i calciatori che hanno contribuito al punteggio
+  - Titolari che hanno giocato E panchinari subentrati vengono identificati correttamente
+  - Non serve più l'asterisco nel nome, il colore è l'unico indicatore
+  
+- **Statistiche Allenatore - Calcolo formazione schierata**: Migliorato algoritmo
+  - Usa `fantavoto_in_verde` quando disponibile (dati da Excel con colori)
+  - Fallback a simulazione sostituzioni se i dati non sono affidabili
+  - Limite garantito di 11 giocatori (1 portiere + 10 movimento)
+
+- **Upload Formazioni Excel**: Caricamento ottimizzato
+  - Opzione `cellStyles: true` per leggere stili e colori
+  - Verifica automatica del colore verde nella cella fantavoto
+  - I nuovi caricamenti avranno dati coerenti con la visualizzazione Excel
+
+---
+
+## [3.12] - 2026-02-06
+
+### Aggiunte
+- **Statistiche Allenatore**: Nuova sottosezione in Dati Lega
+  - Calcolo del coefficiente di efficacia delle formazioni schierate
+  - Confronto formazione schierata vs formazione ottimale calcolabile
+  - Supporto per tutti i moduli consentiti: 3-4-3, 3-5-2, 4-3-3, 4-4-2, 4-5-1, 5-3-2, 5-4-1
+  - Classifica allenatori basata sulla media del coefficiente
+  - Filtri per giornata singola o intervallo di giornate
+  - Filtro per squadra specifica
+  - Dettaglio formazione schierata vs ottimale con evidenziazione differenze
+  - Modal per visualizzare i calciatori che potevano essere sostituiti
+
+- **Upload multiplo file Formazioni Excel**: Possibilità di caricare più file in coda
+  - Selezione multipla di file Excel contemporaneamente
+  - Lista visuale della coda con stato di ogni file
+  - Elaborazione sequenziale con indicatore di progresso
+  - Riepilogo finale con conteggio successi/errori
+
+- **Aggiornamento automatico risultati**: Il caricamento formazioni aggiorna anche i risultati campionato
+  - Estrazione automatica di squadre, punteggi e risultati dal file formazioni
+  - Salvataggio/aggiornamento nella collection results
+  - Le funzioni Calendario e Formazioni coesistono senza conflitti
+
+---
+
 ## [3.11] - 2026-02-04
 
 ### Aggiunte

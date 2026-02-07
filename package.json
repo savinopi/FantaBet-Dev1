@@ -1,7 +1,7 @@
 {
   "name": "fantabet",
-  "version": "3.11.0",
-  "description": "**Versione: 3.11** - FANTABet v3.11: Excel XLSX File Upload Support & Enhanced Bonus Management",
+  "version": "3.12.2",
+  "description": "**Versione: 3.12.2** - FANTABet v3.12.2: Fixed Coach Stats Optimal Formation & Enhanced Mobile UI",
   "main": "index.js",
   "scripts": {
     "build:css": "tailwindcss -i css/input.css -o css/output.css",
