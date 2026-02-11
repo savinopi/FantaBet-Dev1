@@ -37,12 +37,12 @@ import {
 // ===================================
 
 const firebaseConfig = {
-    apiKey: "AIzaSyBRm8jnmciZ_9LUyhL0AWWTt-jVRMy1efQ",
-    authDomain: "fantabet-op.firebaseapp.com",
-    projectId: "fantabet-op",
-    storageBucket: "fantabet-op.firebasestorage.app",
-    messagingSenderId: "1042496289193",
-    appId: "1:1042496289193:web:9e62956ef2da506b80ecb8"
+    apiKey: "AIzaSyBq-2Xnsy3DGt5cu4j22WdxGHYtHHCUomw",
+    authDomain: "fantabet-dev1.firebaseapp.com",
+    projectId: "fantabet-dev1",
+    storageBucket: "fantabet-dev1.firebasestorage.app",
+    messagingSenderId: "829761156989",
+    appId: "1:829761156989:web:e9b98124fe2a7c6ab87e14"
 };
 
 // Inizializza Firebase
