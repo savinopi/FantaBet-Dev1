@@ -10,15 +10,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/savinopi/FantaBet2.git"
+    "url": "git+https://github.com/savinopi/FantaBet-Dev1.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/savinopi/FantaBet2/issues"
+    "url": "https://github.com/savinopi/FantaBet-Dev1/issues"
   },
-  "homepage": "https://github.com/savinopi/FantaBet2#readme",
+  "homepage": "https://github.com/savinopi/FantaBet-Dev1#readme",
   "devDependencies": {
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",

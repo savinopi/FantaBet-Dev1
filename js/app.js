@@ -266,7 +266,7 @@ const updateHomeWelcome = (userProfile) => {
         }
     } else {
         // Nessuna squadra assegnata
-        teamLogoEl.src = 'https://raw.githubusercontent.com/savinopi/FantaBet2/main/assets/esempio%20stemma%20lega.png';
+        teamLogoEl.src = 'https://raw.githubusercontent.com/savinopi/FantaBet-Dev1/main/assets/esempio%20stemma%20lega.png';
         teamLogoEl.alt = 'Logo Lega';
         teamNameEl.textContent = displayName;
         if (teamPositionEl) teamPositionEl.textContent = '';

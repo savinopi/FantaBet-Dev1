@@ -19,7 +19,7 @@ export const ADMIN_USER_IDS = Array.isArray(window.ADMIN_USER_IDS)
 // ===================================
 
 export const GITHUB_USERNAME = 'savinopi';
-export const GITHUB_REPO = 'FantaBet2';
+export const GITHUB_REPO = 'FantaBet-Dev1';
 export const LOGOS_FOLDER = 'assets'; // I loghi sono nella cartella assets
 export const GITHUB_LOGOS_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${GITHUB_REPO}/main/${LOGOS_FOLDER}`;
 
